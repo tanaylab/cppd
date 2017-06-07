@@ -1,0 +1,28 @@
+Package: cppd
+Title: Capture PBAT Probe Designer
+Version: 0.0.0.9000
+Authors@R: person("Aviezer", "Lifshitz", email = "aviezer.lifshitz@weizmann.ac.il", role = c("aut", "cre"))
+Description: Design probes for capture PBAT experiments.
+Depends:
+    R (>= 3.2.4)    
+Imports:
+    plyr,    
+    tibble,
+    dplyr (>= 0.5.0),
+    tidyr,
+    purrr,
+    ggplot2,
+    scales,
+    stringi,
+    stringr,
+    readr,
+    data.table,        
+    doMC,
+    parallel,
+    GetoptLong,
+    logging
+#Remotes: url::http://www.wisdom.weizmann.ac.il/~aviezerl/gpatterns/misha_3.5.4.tar.gz
+License: GPL
+LazyData: true
+RoxygenNote: 6.0.1
+Suggests: testthat

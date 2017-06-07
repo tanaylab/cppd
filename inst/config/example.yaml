@@ -1,0 +1,21 @@
+probes_dir: /home/aviezerl/temp/cppd/t
+insert_length: 350
+regions: ${probes_dir}/regions.csv
+regions_expanded: ${probes_dir}/regions_expanded.csv
+regions_annot: ${probes_dir}/regions_annot.csv
+candidates: ${probes_dir}/cands.csv
+
+probes: ${probes_dir}/probes.csv
+stats: ${probes_dir}/stats.csv
+
+n_probes: 200
+downsample: TRUE
+all_probes_ofn: ${probes_dir}/all_probes.csv
+
+genome: hg19
+
+# chunk_size: 1000000
+
+
+
+
