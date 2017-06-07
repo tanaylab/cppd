@@ -1,0 +1,44 @@
+# probe lengthes
+probe_len: 60
+step: 5
+expand: 50
+insert_length: 300
+max_len: 651
+
+# Performance
+threads: 10 # number of threads (for bowtie and kmer counting)
+max_mapping_k: 5 # maximal number of mappings in bowtie
+chunk_size: 70000
+
+# Probe requirments
+min_cgs: 1
+kmer_k: 15
+max_kmers: 20000
+
+TM_range:
+  - 56
+  - 72
+optimal_TM_range:
+  - 62
+  - 65
+
+max_map: 1
+max_homopol: 8
+max_revcomp: 4
+max_shared_revcomp: 15
+
+# binaries
+bowtie_bin: '/net/mraid14/export/data/users/eladch/tools/CO6/bowtie2/2.2.6/bin/bowtie2-align-l'
+jellyfish_bin: '/net/mraid14/export/tgdata/users/aviezerl/tools/jellyfish-2.2.6/bin/jellyfish'
+
+
+genomes:
+  hg19:
+    misha_root: /home/aviezerl/hg19
+    bissli2_idx: /net/mraid14/export/data/tools/bissli2/hg19/hg19
+    jellyfish_unmethylated_db: /net/mraid14/export/data/tools/jellyfish/hg19/15_kmers_unmethylated.jf
+    jellyfish_methylated_db: /net/mraid14/export/data/tools/jellyfish/hg19/15_kmers_methylated.jf   
+
+# misc
+jellyfish_db_type: jf
+
