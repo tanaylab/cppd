@@ -8,7 +8,8 @@ max_len: 651
 # Performance
 threads: 10 # number of threads (for bowtie and kmer counting)
 max_mapping_k: 5 # maximal number of mappings in bowtie
-chunk_size: 70000
+chunk_size: 50000
+use_sge: false
 
 # Probe requirments
 min_cgs: 1
@@ -38,6 +39,11 @@ genomes:
     bissli2_idx: /net/mraid14/export/data/tools/bissli2/hg19/hg19
     jellyfish_unmethylated_db: /net/mraid14/export/data/tools/jellyfish/hg19/15_kmers_unmethylated.jf
     jellyfish_methylated_db: /net/mraid14/export/data/tools/jellyfish/hg19/15_kmers_methylated.jf   
+  mm9:
+    misha_root: /home/aviezerl/mm9
+    bissli2_idx: /net/mraid14/export/data/tools/bissli2/mm9/mm9
+    jellyfish_unmethylated_db: /net/mraid14/export/data/tools/jellyfish/mm9/15_kmers_unmethylated.jf
+    jellyfish_methylated_db: /net/mraid14/export/data/tools/jellyfish/mm9/15_kmers_methylated.jf   
 
 # misc
 jellyfish_db_type: jf

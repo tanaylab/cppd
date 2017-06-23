@@ -4,10 +4,26 @@
 \alias{cppd.dump_example_config}
 \title{Dump config file templates.}
 \usage{
-cppd.dump_example_config(path)
+cppd.dump_example_config(path, name = "example.yaml", probes_dir = NULL,
+  genome = NULL, n_probes = 20000, downsample = FALSE,
+  insert_length = 350, annotations = FALSE)
 }
 \arguments{
 \item{path}{directory to dump files to.}
+
+\item{name}{name of yaml config file}
+
+\item{probes_dir}{(name of the probes dir)}
+
+\item{genome}{genome id}
+
+\item{n_probes}{number of desired probes}
+
+\item{downsample}{downsample to \code{n_probes} probes}
+
+\item{insert_length}{insert length of the probes}
+
+\item{annotations}{use regions annotations}
 }
 \description{
 Dump templates of config files required by the package.

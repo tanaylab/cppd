@@ -127,6 +127,18 @@ gintervals.distance <- function(start1,end1,start2,end2) {
 }
 
 
+#' @export
+gintervals.center <- function(intervals1, intervals2, max_dist=0, size=NULL){
+    res <- intervals1 %>% 
+        gintervals.neighbors1(intervals2, na.if.notfound=T) %>% 
+        filter(abs(dist) <= max_dist) %>% 
+        select(chrom=chrom1, start=start1, end=end1, chrom_orig=chrom, start_orig=start, end_orig=end)
+    if (!is.null(size)){
+        res <- res %>% gintervals.normalize(size) %>% tbl_df
+    }
+    return(res)    
+}
+
 #' Creates a virtual track and runs gextract
 #'
 #' @param tracks tracks
@@ -181,7 +193,7 @@ gvextract <- function(tracks, intervals, colnames = NULL, iterator = NULL,
 #' @seealso \link[misha]{gextract}
 #' @examples
 gextract.left_join <- function(expr, intervals = NULL, colnames = NULL, iterator = NULL, band = NULL, file = NULL, intervals.set.out = NULL, suffix='1'){
-    if (class(intervals) == 'character'){
+    if ('character' %in% class(intervals)){
         intervals <- gintervals.load(intervals)
     }
     d <- gextract(expr, intervals = intervals, colnames = colnames, iterator = iterator, band = band, file = file, intervals.set.out = intervals.set.out)
@@ -393,9 +405,11 @@ gcluster.run2 <- function (...,
                            jobs_title = NULL,
                            job_names = NULL,
                            collapse_results = FALSE,
+                           queue = NULL,
                            memory = NULL,
                            threads = NULL,
                            io_saturation = NULL,
+                           queue_flag = '-q @{queue}',
                            memory_flag = '-l mem_free=@{memory}G',
                            threads_flag = '-pe threads @{threads}',
                            io_saturation_flag = '-l io_saturation=@{io_saturation}',
@@ -405,6 +419,10 @@ gcluster.run2 <- function (...,
         commands <- purrr::map(command_list, function(x) parse(text=x))
     } else {
         commands <- as.list(substitute(list(...))[-1L])
+    }
+
+    if (!is.null(queue)){
+        opt.flags <- paste(opt.flags, qq(queue_flag))
     }
 
     if (!is.null(memory)){
@@ -438,7 +456,9 @@ gcluster.run2 <- function (...,
         envir <- parent.frame()
         while (!identical(envir, .GlobalEnv)) {
             envir <- parent.env(envir)
-            vars <- union(vars, ls(all.names = TRUE, envir = envir))
+            if (!isNamespace(envir)) {                
+                vars <- union(vars, ls(all.names = TRUE, envir = envir))
+            }
         }
 
         suppressWarnings(save(list = vars, file = paste(tmp.dirname, "envir",
@@ -600,13 +620,9 @@ gcluster.run2 <- function (...,
 #' @examples
 gtrack.array.import_from_df <- function(df, track, description) {
     fn <- tempfile()
-    data.table::fwrite(format(df, scientific = FALSE), fn, na = "nan", row.names = FALSE,
-                       quote = FALSE, sep = "\t")
-    # write.table(format(df, scientific = FALSE), fn, na = "nan", row.names = FALSE,
-                # quote = FALSE, sep = "\t")
+    data.table::fwrite(format(as.data.frame(df), scientific = FALSE), fn, na = "nan", row.names = FALSE, quote = FALSE, sep = "\t")    
     tryCatch(gtrack.array.import(track, description, fn),
              finally=system(qq('rm -f @{fn}')))
-
 }
 
 .gtrack.union_intervals <- function(tracks, intervals=ALLGENOME, iterator=NULL, parallel=TRUE, nchunks=5){
@@ -646,62 +662,6 @@ gtrack.array.import_from_tracks <- function(tracks, intervals, track, descriptio
     tryCatch(gtrack.array.import(track, description, fn),
              finally=system(qq('rm -f @{fn}')))
 }
-
-gtrack.array.import <- function (track = NULL, description = NULL, ...)
-{
-    args <- as.list(substitute(list(...)))[-1L]
-    if (is.null(substitute(track)) || is.null(description) ||
-        !length(args))
-        stop("Usage: gtrack.array.import(track, description, [src]+)",
-             call. = F)
-    .gcheckroot()
-    trackstr <- do.call(.gexpr2str, list(substitute(track)),
-                        envir = parent.frame())
-    srcs <- c()
-    colnames <- list()
-    for (src in args) {
-        src <- do.call(.gexpr2str, list(src), envir = parent.frame())
-        srcs <- c(srcs, src)
-        if (is.na(match(src, get("GTRACKS"))))
-            colnames[[length(colnames) + 1]] <- as.character(NULL)
-        else {
-            if (.gcall_noninteractive(gtrack.info, src)$type !=
-                "array")
-                stop(sprintf("Track %s: only array tracks can be used as a source",
-                             src), call. = F)
-            colnames[[length(colnames) + 1]] <- names(.gtrack.array.get_colnames(src))
-        }
-    }
-    trackdir <- sprintf("%s.track", paste(get("GWD"), gsub("\\.",
-                                                           "/", trackstr), sep = "/"))
-    direxisted <- file.exists(trackdir)
-    if (!is.na(match(trackstr, get("GTRACKS"))))
-        stop(sprintf("Track %s already exists", trackstr), call. = F)
-    .gconfirmtrackcreate(trackstr)
-    success <- FALSE
-    tryCatch({
-        colnames <- .gcall("garrays_import", trackstr, srcs,
-                           colnames, new.env(parent = parent.frame()), silent = TRUE)
-        gdb.reload()
-        .gtrack.array.set_colnames(trackstr, colnames, FALSE)
-        created.by <- sprintf("gtrack.array.import(\"%s\", description, src = c(\"%s\"))",
-                              trackstr, paste(srcs, collapse = "\", \""))
-        .gtrack.attr.set(trackstr, "created.by", created.by,
-                         T)
-        .gtrack.attr.set(trackstr, "created.date", date(), T)
-        .gtrack.attr.set(trackstr, "description", description,
-                         T)
-        success <- TRUE
-    }, finally = {
-        if (!success && !direxisted) {
-            unlink(trackdir, recursive = TRUE)
-            gdb.reload(rescan = FALSE)
-        }
-    })
-    retv <- 0
-}
-
-
 
 #' Wrapper around gtrack.import_mappedseq for (multiple) bam files
 #'
