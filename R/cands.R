@@ -1,5 +1,5 @@
 
-get_candidates <- function(regs, probe_len, step, expand, threads, bowtie_bin, bissli2_idx, max_mapping_k, jellyfish_unmethylated_db, jellyfish_methylated_db, jellyfish_db_type, kmer_k, jellyfish_bin, TM_range, filter_cands=TRUE, max_map, max_homopol, max_revcomp, max_kmers, ...){
+get_candidates <- function(regs, probe_len, step, expand, threads, bowtie_bin, bissli2_idx, max_mapping_k, jellyfish_unmethylated_db, jellyfish_methylated_db, jellyfish_db_type, kmer_k, jellyfish_bin, TM_range, max_map, max_homopol, max_revcomp, max_kmers, filter_cands=TRUE, cands_ofn=NULL, regs_exp_ofn=NULL, ...){
 
     if (threads > 1){
         doMC::registerDoMC(threads)
@@ -59,8 +59,19 @@ get_candidates <- function(regs, probe_len, step, expand, threads, bowtie_bin, b
         loginfo('candidates left: %d (%f)', nrow(cands), nrow(cands) / init_cands_num)
     }
 
-    return(list(cands=cands, regs_exp=regs_exp))   
+    if (!is.null(cands_ofn)){
+        loginfo('wrinting cands to %s', cands_ofn)
+        fwrite(cands, cands_ofn)
+    }
 
+    if (!is.null(regs_exp_ofn)){
+        loginfo('wrinting expanded regions to %s', regs_exp_ofn)
+        fwrite(regs_exp, regs_exp_ofn)
+    }
+
+    if (is.null(cands_ofn) || is.null(regs_exp_ofn)){
+        return(list(cands=cands, regs_exp=regs_exp))   
+    }
 }
 
 
@@ -139,7 +150,7 @@ split_intervals <- function(intervs){
   intervs %>% mutate(end = end - ceiling(l/2)) %>% bind_rows(intervs %>% mutate(start = start + floor(l/2))) %>% select(-l)
 }
 
-regions2seq <- function(sprobes_all, expand, max_len=651, exp_tab_fn=NULL, min_cgs=1){        
+regions2seq <- function(sprobes_all, expand, max_len=651, exp_tab_fn=NULL, min_cgs=1){         
     sprobes <- sprobes_all %>% mutate(start = start - expand, end = end + expand) %>% as.data.frame %>% gintervals.force_range() %>% gintervals.canonic() %>% mutate(l = end - start, split = l > as.numeric(max_len)) %>% tbl_df
     
     loginfo("max_len: %s", max_len)

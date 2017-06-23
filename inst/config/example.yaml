@@ -14,8 +14,4 @@ all_probes_ofn: ${probes_dir}/all_probes.csv
 
 genome: hg19
 
-# chunk_size: 1000000
-
-
-
 

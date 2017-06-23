@@ -4,7 +4,7 @@
 #' @param defaults_fn default configuration file (optional)
 #' @param log_fn log file (optional)
 #' @param return_probes return a data frame with the probes
-#' 
+#'
 #' @return probes data frame if return_probes is TRUE, and NULL otherwise
 #'
 #' @export
@@ -14,12 +14,12 @@ cppd.generate_probes <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_
     }
     conf <- read_yaml(conf_fn)
     if (!is.null(defaults_fn)){
-        defaults <- read_yaml(defaults_fn)        
+        defaults <- read_yaml(defaults_fn)
         conf <- plyr::defaults(conf, defaults)
     }
     conf <- apply_genome_conf(conf)
 
-    cmd_args <- conf2args(conf, c(generate_probes, get_candidates, regions2seq))   
+    cmd_args <- conf2args(conf, c(generate_probes, get_candidates, regions2seq))
 
     loginfo('run with the following paramters:')
     walk2(names(cmd_args), cmd_args, function(x, y) loginfo("%s: %s", x, y))
@@ -37,16 +37,47 @@ cppd.generate_probes <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_
 #' Dump templates of config files required by the package.
 #'
 #' @param path directory to dump files to.
+#' @param name name of yaml config file
+#' @param probes_dir (name of the probes dir)
+#' @param genome genome id
+#' @param n_probes number of desired probes
+#' @param downsample downsample to \code{n_probes} probes
+#' @param insert_length insert length of the probes
+#' @param annotations use regions annotations
 #'
 #' @export
-cppd.dump_example_config <- function(path){
+cppd.dump_example_config <- function(path,
+                                     name='example.yaml',
+                                     probes_dir=NULL,
+                                     genome=NULL,
+                                     n_probes=20000,
+                                     downsample=FALSE,
+                                     insert_length=350,
+                                     annotations=FALSE){
     config_files <- dir(system.file("config", package='cppd'), full.names=T)
+    defaults_conf <- system.file('config/defaults.yaml', package='cppd')
     dir.create(path, recursive=T, showWarnings=FALSE)
-    ret <- file.copy(config_files, path, recursive=T, overwrite=FALSE)
+    ret <- file.copy(defaults_conf, path, recursive=T, overwrite=TRUE)
+
+    example <- yaml::yaml.load_file(system.file('config/example.yaml', package='cppd'))
+    if (!is.null(probes_dir)){
+        example[['probes_dir']] <- probes_dir
+    }
+    if (!is.null(genome)){
+        example[['genome']] <- genome
+    }
+    example[['n_probes']] <- n_probes
+    example[['downsample']] <- downsample
+    example[['insert_length']] <- insert_length
+    if (!annotations){
+        example[['regions_annot']] <- NULL
+    }
+    write_lines(yaml::as.yaml(example), paste0(path, '/', name))
+
     if (!all(ret)) {
-        warning("Couldn't dump config files to ", path, "\n  Perhaps they're already there? ")
+        logwarn("Couldn't dump config files to: %s", path)
     } else {
-        message("Dumped config files to: ", path)
+        loginfo("Dumped config files to: %s", path)
     }
 }
 
@@ -78,7 +109,7 @@ cppd.choose_from_cands <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, retur
 }
 
 
-generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, ...){
+generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, ...){
     if (!is.null(misha_root)){
         gsetroot(misha_root)
     }
@@ -90,23 +121,42 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
     if (!keep_field){
         regions[['keep']] <- FALSE
     }
+    
 
     nchunks <- ceiling(nrow(regions) / chunk_size)
-    loginfo(qq('number of chunks: @{nchunks}'))  
+    loginfo(qq('number of chunks: @{nchunks}'))
 
-    cands <- regions %>% mutate(chunk = ntile(1:n(), nchunks)) %>% group_by(chunk) %>% by_slice(~ do.call_ellipsis(get_candidates, list(regs=., TM_range=TM_range, threads=threads), ...))
+    regs <- regions %>% mutate(chunk = ntile(1:n(), nchunks))
+    run_chunk <- function(chunk_num, ...){   
+        loginfo('chunk %d', chunk_num)     
+        do.call_ellipsis(get_candidates, 
+            list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
+                TM_range=TM_range, 
+                threads=threads, 
+                cands_ofn=paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_cands'), 
+                regs_exp_ofn=paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_regs_exp')), ...)
+    }
+
+    if (use_sge){
+        cmds <- paste0('run_chunk(', 1:nchunks, ', ...)')            
+        res <- gcluster.run2(command_list=cmds, ...)
+    } else {
+        walk(1:nchunks, ~ run_chunk(.x, ...))
+    }   
     
-    regs_exp <- cands$.out %>% map_df('regs_exp')
+    loginfo('collecting chunks expanded regions')
+    regs_exp <- map_df(list.files(workdir, pattern='.+_chunk_\\d+_regs_exp', full.names=TRUE), ~ fread(.)) %>% as.tibble()
 
     if (!is.null(regions_expanded)){
-        write_csv(regs_exp, regions_expanded)
+        fwrite(regs_exp, regions_expanded, sep=',')
     }
 
-    cands <- cands$.out %>% map_df('cands')
+    loginfo('collecting chunks candidates')
+    cands <- map_df(list.files(workdir, pattern='.+_chunk_\\d+_cands', full.names=TRUE), ~ fread(.)) %>% as.tibble()   
     if (!is.null(candidates)){
-        write_csv(cands, candidates)
+        fwrite(cands, candidates, sep=',')
     }
-
+    
     probes <- choose_probes(cands=cands, regions=regions, exp_regions=regs_exp, probes_ofn=probes, regs_annots=regions_annot, n_probes=n_probes, kmer_len=max_shared_revcomp, downsample=downsample, TM_range=optimal_TM_range, rm_revcomp=rm_revcomp)
 
     if (!keep_field){
