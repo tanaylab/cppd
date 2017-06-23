@@ -109,10 +109,14 @@ cppd.choose_from_cands <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, retur
 }
 
 
-generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, ...){
+generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge_cands=NULL, use_sge_choose=NULL, use_sge=FALSE, ...){
     if (!is.null(misha_root)){
         gsetroot(misha_root)
     }
+
+    use_sge_cands <- use_sge_cands %||% use_sge
+    use_sge_choose <- use_sge_choose %||% use_sge
+
     if (is.character(regions)){
         regions <- fread(regions) %>% tbl_df
     }
@@ -137,7 +141,7 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
                 regs_exp_ofn=paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_regs_exp')), ...)
     }
 
-    if (use_sge){
+    if (use_sge_cands){
         cmds <- paste0('run_chunk(', 1:nchunks, ', ...)')            
         res <- gcluster.run2(command_list=cmds, ...)
     } else {
@@ -157,11 +161,27 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
         fwrite(cands, candidates, sep=',')
     }
     
-    probes <- choose_probes(cands=cands, regions=regions, exp_regions=regs_exp, probes_ofn=probes, regs_annots=regions_annot, n_probes=n_probes, kmer_len=max_shared_revcomp, downsample=downsample, TM_range=optimal_TM_range, rm_revcomp=rm_revcomp)
+    cands <- cands %>% left_join(cands %>% distinct(chrom, start_reg, end_reg) %>% mutate(chunk = ntile(1:n(), nchunks)), by=c('chrom', 'start_reg', 'end_reg'))
 
-    if (!keep_field){
-        regions <- regions %>% select(-keep)
+    choose_chunk <- function(chunk_num){
+        loginfo('chunk %d', chunk_num)     
+        choose_probes_per_regions(cands=cands %>% filter(chunk == chunk_num) %>% select(-chunk), 
+                exp_regions=regs_exp,
+                TM_range=optimal_TM_range)       
     }
+
+    loginfo('choosing candidates per chunk. # of chunks: %d', nchunks)
+    if (use_sge_choose){
+        cmds <- paste0('choose_chunk(', 1:nchunks, ')')            
+        chosen_cands <- gcluster.run2(command_list=cmds, ...) %>% map_df('retv')
+    } else {
+        # chosen_cands <- map_df(1:nchunks, ~ choose_chunk(.x))
+        chosen_cands <- plyr::adply(1:nchunks, 1, function(.x) choose_chunk(.x), .parallel = TRUE)
+    }       
+
+    loginfo('calculating multiple-regions statistics')
+    probes <- choose_probes(probes=chosen_cands, regions=regions, exp_regions=regs_exp, probes_ofn=probes, regs_annots=regions_annot, n_probes=n_probes, kmer_len=max_shared_revcomp, downsample=downsample, rm_revcomp=rm_revcomp)
+
     return(probes)
 }
 
