@@ -1,44 +1,4 @@
-choose_probes <- function(cands, regions, exp_regions, TM_range, probes_ofn=NULL, all_probes_ofn=NULL, regs_annots=NULL, n_probes=NULL, kmer_len=15, downsample=FALSE, rm_revcomp=TRUE){
-    
-    cands <- annotate_cands(cands, exp_regions)
-
-    loginfo('counting CpGs per strand')
-    cands <- get_min_cgs_per_strand(cands)  
-
-    loginfo('sorting candidates')
-    cands <- sort_cands(cands, TM_range)
-    
-    loginfo('Analyzing single CpG candidates')
-    # single CpG
-    probes00 <- get_probes(cands, 0, 0, TM_range)
-    probes11 <- get_probes(cands, 1, 1, TM_range)
-    probes10 <- get_probes(cands, 1, 0, TM_range)
-    probes01 <- get_probes(cands, 0, 1, TM_range)
-
-    # two CpGs
-    loginfo('Analyzing 2 CpGs candidates')
-    # Try to get 2 probes from the 0 strand
-    probes20 <- cands %>% filter(strand == -1) %>% get_probes(2, 0, TM_range, 2)
-    probes02 <- cands %>% filter(strand == 1) %>% get_probes(0, 2, TM_range, 2)
-
-    # take the important 2-0/0-2 regions and discard the rest
-    left_regs <- probes20 %>% group_by(chrom, start_reg, end_reg) %>% filter(keep, n() == 1) %>% ungroup %>% distinct(chrom, start_reg, end_reg)
-    probes20 <- probes20 %>% group_by(chrom, start_reg, end_reg) %>% filter(n() == 2) %>% ungroup
-    probes20_cgs <- cands %>% inner_join(left_regs) %>% ungroup %>% get_probes(2, 0, TM_range, 1)
-
-
-    left_regs <- probes02 %>% group_by(chrom, start_reg, end_reg) %>% filter(keep, n() == 1) %>% ungroup %>% distinct(chrom, start_reg, end_reg)
-    probes02 <- probes02 %>% group_by(chrom, start_reg, end_reg) %>% filter(n() == 2) %>% ungroup
-    probes02_cgs <- cands %>% inner_join(left_regs) %>% ungroup %>% get_probes(0, 2, TM_range, 1)
-
-    # high number of CpGs in important regions
-    high_cg_cands <- cands %>% group_by(chrom, start_reg, end_reg) %>% filter(min(cg_num) >= 2, keep) %>% ungroup
-
-    probes <- bind_rows(probes00, probes11, probes10, probes01, probes20, probes02, probes20_cgs, probes02_cgs) 
-
-    loginfo('adding sequence')    
-    probes <- add_probe_seq(probes)
-
+choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_probes_ofn=NULL, regs_annots=NULL, n_probes=NULL, kmer_len=15, downsample=FALSE, rm_revcomp=TRUE){
     if (rm_revcomp){
         loginfo('checking reverse complementarity')   
         p1 <- probes %>% arrange(-keep, chrom, start_reg, end_reg) %>% add_kmer_revcomp(k=kmer_len)  
@@ -79,6 +39,52 @@ choose_probes <- function(cands, regions, exp_regions, TM_range, probes_ofn=NULL
         write_csv(probes, probes_ofn)
     }
 
+    return(probes)
+}
+
+
+choose_probes_per_regions <- function(cands, exp_regions, TM_range){
+    
+    cands <- annotate_cands(cands, exp_regions)
+
+    loginfo('counting CpGs per strand')
+    cands <- get_min_cgs_per_strand(cands)  
+
+    loginfo('sorting candidates')
+    cands <- sort_cands(cands, TM_range)
+    
+    loginfo('Analyzing single CpG candidates')
+    # single CpG
+    probes00 <- get_probes(cands, 0, 0, TM_range)
+    probes11 <- get_probes(cands, 1, 1, TM_range)
+    probes10 <- get_probes(cands, 1, 0, TM_range)
+    probes01 <- get_probes(cands, 0, 1, TM_range)
+
+    # two CpGs
+    loginfo('Analyzing 2 CpGs candidates')
+    # Try to get 2 probes from the 0 strand
+    probes20 <- cands %>% filter(strand == -1) %>% get_probes(2, 0, TM_range, 2)
+    probes02 <- cands %>% filter(strand == 1) %>% get_probes(0, 2, TM_range, 2)
+
+    # take the important 2-0/0-2 regions and discard the rest
+    left_regs <- probes20 %>% group_by(chrom, start_reg, end_reg) %>% filter(keep, n() == 1) %>% ungroup %>% distinct(chrom, start_reg, end_reg)
+    probes20 <- probes20 %>% group_by(chrom, start_reg, end_reg) %>% filter(n() == 2) %>% ungroup
+    probes20_cgs <- cands %>% inner_join(left_regs) %>% ungroup %>% get_probes(2, 0, TM_range, 1)
+
+
+    left_regs <- probes02 %>% group_by(chrom, start_reg, end_reg) %>% filter(keep, n() == 1) %>% ungroup %>% distinct(chrom, start_reg, end_reg)
+    probes02 <- probes02 %>% group_by(chrom, start_reg, end_reg) %>% filter(n() == 2) %>% ungroup
+    probes02_cgs <- cands %>% inner_join(left_regs) %>% ungroup %>% get_probes(0, 2, TM_range, 1)
+
+    # high number of CpGs in important regions
+    high_cg_cands <- cands %>% group_by(chrom, start_reg, end_reg) %>% filter(min(cg_num) >= 2, keep) %>% ungroup
+
+    probes <- bind_rows(probes00, probes11, probes10, probes01, probes20, probes02, probes20_cgs, probes02_cgs) 
+
+    loginfo('adding sequence')    
+    probes <- add_probe_seq(probes)
+
+
     return(probes)   
 }
 
@@ -91,7 +97,7 @@ annotate_cands <- function(cands, exp_regs){
     cands <- add_GC_cont(cands) 
 
     # add keep annotation     
-    cands <- cands %>% left_join(exp_regs %>% select(chrom, start_reg, end_reg, keep))
+    cands <- cands %>% left_join(exp_regs %>% select(chrom, start_reg, end_reg, keep))   
     return(cands)
 }
 
