@@ -414,7 +414,7 @@ gcluster.run2 <- function (...,
                            threads_flag = '-pe threads @{threads}',
                            io_saturation_flag = '-l io_saturation=@{io_saturation}',
                            script =paste(Sys.getenv('ANALYSIS_HOME'), 'common', 'sgjob.sh', sep='/')){
-
+    
     if (!is.null(command_list)){ 
         commands <- purrr::map(command_list, function(x) parse(text=x))
     } else {
