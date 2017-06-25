@@ -19,7 +19,7 @@ cppd.generate_probes <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_
     }
     conf <- apply_genome_conf(conf)
 
-    cmd_args <- conf2args(conf, c(generate_probes, get_candidates, regions2seq))
+    cmd_args <- conf2args(conf, c(generate_probes, get_candidates, regions2seq, gcluster.run2))
 
     loginfo('run with the following paramters:')
     walk2(names(cmd_args), cmd_args, function(x, y) loginfo("%s: %s", x, y))
@@ -109,13 +109,10 @@ cppd.choose_from_cands <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, retur
 }
 
 
-generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge_cands=NULL, use_sge_choose=NULL, use_sge=FALSE, ...){
+generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, ...){
     if (!is.null(misha_root)){
         gsetroot(misha_root)
     }
-
-    use_sge_cands <- use_sge_cands %||% use_sge
-    use_sge_choose <- use_sge_choose %||% use_sge
 
     if (is.character(regions)){
         regions <- fread(regions) %>% tbl_df
@@ -126,59 +123,50 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
         regions[['keep']] <- FALSE
     }
     
-
     nchunks <- ceiling(nrow(regions) / chunk_size)
     loginfo(qq('number of chunks: @{nchunks}'))
 
     regs <- regions %>% mutate(chunk = ntile(1:n(), nchunks))
+
     run_chunk <- function(chunk_num, ...){   
-        loginfo('chunk %d', chunk_num)     
+        loginfo('chunk %d', chunk_num)   
+        cands_ofn <- paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_cands')
+        regs_exp_ofn <- paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_regs_exp')
         do.call_ellipsis(get_candidates, 
             list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
                 TM_range=TM_range, 
                 threads=threads, 
-                cands_ofn=paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_cands'), 
-                regs_exp_ofn=paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_regs_exp')), ...)
+                cands_ofn=cands_ofn, 
+                regs_exp_ofn=regs_exp_ofn), ...)
+        cands <- fread(cands_ofn, sep=',') %>% as.tibble()
+        regs_exp <- fread(regs_exp_ofn, sep=',') %>% as.tibble()
+        chosen_cands <- choose_probes_per_regions(cands=cands, 
+                exp_regions=regs_exp,
+                TM_range=optimal_TM_range)
+        return(chosen_cands)
     }
 
-    if (use_sge_cands){
+    if (use_sge){
         cmds <- paste0('run_chunk(', 1:nchunks, ', ...)')            
         res <- gcluster.run2(command_list=cmds, ...)
+        chosen_cands <- map_df(res, 'retv')
     } else {
-        walk(1:nchunks, ~ run_chunk(.x, ...))
+        chosen_cands <- map_df(1:nchunks, ~ run_chunk(.x, ...))
     }   
     
-    loginfo('collecting chunks expanded regions')
+    loginfo('collecting chunks - expanded regions')
     regs_exp <- map_df(list.files(workdir, pattern='.+_chunk_\\d+_regs_exp', full.names=TRUE), ~ fread(.)) %>% as.tibble()
 
     if (!is.null(regions_expanded)){
         fwrite(regs_exp, regions_expanded, sep=',')
     }
 
-    loginfo('collecting chunks candidates')
+    loginfo('collecting chunks - candidates')
     cands <- map_df(list.files(workdir, pattern='.+_chunk_\\d+_cands', full.names=TRUE), ~ fread(.)) %>% as.tibble()   
     if (!is.null(candidates)){
         fwrite(cands, candidates, sep=',')
     }
     
-    cands <- cands %>% left_join(cands %>% distinct(chrom, start_reg, end_reg) %>% mutate(chunk = ntile(1:n(), nchunks)), by=c('chrom', 'start_reg', 'end_reg'))
-
-    choose_chunk <- function(chunk_num){
-        loginfo('chunk %d', chunk_num)     
-        choose_probes_per_regions(cands=cands %>% filter(chunk == chunk_num) %>% select(-chunk), 
-                exp_regions=regs_exp,
-                TM_range=optimal_TM_range)       
-    }
-
-    loginfo('choosing candidates per chunk. # of chunks: %d', nchunks)
-    if (use_sge_choose){
-        cmds <- paste0('choose_chunk(', 1:nchunks, ')')            
-        chosen_cands <- gcluster.run2(command_list=cmds, ...) %>% map_df('retv')
-    } else {
-        # chosen_cands <- map_df(1:nchunks, ~ choose_chunk(.x))
-        chosen_cands <- plyr::adply(1:nchunks, 1, function(.x) choose_chunk(.x), .parallel = TRUE)
-    }       
-
     loginfo('calculating multiple-regions statistics')
     probes <- choose_probes(probes=chosen_cands, regions=regions, exp_regions=regs_exp, probes_ofn=probes, regs_annots=regions_annot, n_probes=n_probes, kmer_len=max_shared_revcomp, downsample=downsample, rm_revcomp=rm_revcomp)
 
