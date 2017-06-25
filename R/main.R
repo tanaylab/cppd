@@ -128,10 +128,10 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
 
     regs <- regions %>% mutate(chunk = ntile(1:n(), nchunks))
 
-    run_chunk <- function(chunk_num, ...){   
+    run_chunk <- function(chunk_num, temp_prefix, ...){   
         loginfo('chunk %d', chunk_num)   
-        cands_ofn <- paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_cands')
-        regs_exp_ofn <- paste0(tempfile(tmpdir=workdir), '_chunk_', chunk_num, '_regs_exp')
+        cands_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_cands')        
+        regs_exp_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_regs_exp')
         do.call_ellipsis(get_candidates, 
             list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
                 TM_range=TM_range, 
@@ -146,23 +146,27 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
         return(chosen_cands)
     }
 
+    temp_prefix <- tempfile(tmpdir=workdir)
+    on.exit(system(qq('rm -f @{temp_prefix}*')))
+
     if (use_sge){
-        cmds <- paste0('run_chunk(', 1:nchunks, ', ...)')            
+        cmds <- paste0('run_chunk(', 1:nchunks, ', temp_prefix=temp_prefix, ...)')            
         res <- gcluster.run2(command_list=cmds, ...)
         chosen_cands <- map_df(res, 'retv')
     } else {
-        chosen_cands <- map_df(1:nchunks, ~ run_chunk(.x, ...))
+        chosen_cands <- map_df(1:nchunks, ~ run_chunk(.x, temp_prefix=temp_prefix, ...))
     }   
     
     loginfo('collecting chunks - expanded regions')
-    regs_exp <- map_df(list.files(workdir, pattern='.+_chunk_\\d+_regs_exp', full.names=TRUE), ~ fread(.)) %>% as.tibble()
+    regs_exp <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), ~ fread(.)) %>% as.tibble()
 
     if (!is.null(regions_expanded)){
         fwrite(regs_exp, regions_expanded, sep=',')
     }
 
     loginfo('collecting chunks - candidates')
-    cands <- map_df(list.files(workdir, pattern='.+_chunk_\\d+_cands', full.names=TRUE), ~ fread(.)) %>% as.tibble()   
+    cands <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), ~ fread(.)) %>% as.tibble()
+    
     if (!is.null(candidates)){
         fwrite(cands, candidates, sep=',')
     }

@@ -102,7 +102,7 @@ annotate_cands <- function(cands, exp_regs){
 }
 
 add_cg_num <- function(cands){ 
-    cands <- cands %>% mutate(cg_num = str_count(seq, 'CG'))
+    cands <- cands %>% mutate(cg_num = str_count(seq, 'CG'))        
     return(cands)
 }
 
