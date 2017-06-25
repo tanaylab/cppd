@@ -5,12 +5,10 @@ get_candidates <- function(regs, probe_len, step, expand, threads, bowtie_bin, b
         doMC::registerDoMC(threads)
     }
     
-    regs_exp <- do.call_ellipsis(regions2seq, list(sprobes_all=regs, expand=expand), ...) %>% mutate(start_reg=start, end_reg=end)
-    # regions2seq(regs, expand=expand, ...) %>% mutate(start_reg=start, end_reg=end)
+    regs_exp <- do.call_ellipsis(regions2seq, list(sprobes_all=regs, expand=expand), ...) %>% mutate(start_reg=start, end_reg=end)    
 
     max_str_len <- max(str_length(regs_exp$seq) )
-    cands <- map_df(seq(1, max_str_len-probe_len, step), ~ get_cand_seq(regs_exp, ., probe_len)) 
-
+    cands <- map_df(seq(1, max_str_len-probe_len, step), ~ get_cand_seq(regs_exp, ., probe_len))     
     init_cands_num <- nrow(cands)
     loginfo('initial number of candidates: %d', init_cands_num)
 
@@ -76,8 +74,10 @@ get_candidates <- function(regs, probe_len, step, expand, threads, bowtie_bin, b
 
 
 ############################################################################
-get_cand_seq <- function(regs_exp, offset, probe_len){
-    regs_exp %>% mutate(seq = substring(seq, offset, offset + probe_len - 1), start = start + offset - 1, end = start + probe_len) %>% filter(str_length(seq) == probe_len) %>% select(-cgs)
+get_cand_seq <- function(regs_exp, offset, probe_len){    
+    plus_strand <- regs_exp %>% filter(strand == 1) %>% mutate(seq = substring(seq, offset, offset + probe_len - 1), start = start + offset - 1, end = start + probe_len)
+    minus_strand <- regs_exp %>% filter(strand == -1) %>% mutate(seq = substring(seq, str_length(seq) - offset - probe_len + 2, str_length(seq) - offset + 1), start = start + offset - 1, end = start + probe_len)
+    bind_rows(plus_strand, minus_strand) %>% filter(str_length(seq) == probe_len) %>% select(-cgs)   
 }
 
 convert_seq <- function(seqs, methylated=FALSE){
@@ -170,6 +170,12 @@ regions2seq <- function(sprobes_all, expand, max_len=651, exp_tab_fn=NULL, min_c
 
     loginfo("counting CpGs\n")
     sprobes <- sprobes %>% mutate(cgs = str_count(seq, 'CG'))   
+
+    loginfo("filtering regions with less than %d CpGs", min_cgs)
+    prev_num <- nrow(sprobes)
+    sprobes <- sprobes %>% filter(cgs >= min_cgs)
+    filtered_num <- prev_num - nrow(sprobes)
+    loginfo("filtered %s (%d out of %d)", scales::percent(filtered_num/prev_num), filtered_num, prev_num)
 
     loginfo("adding reverse strand\n")
     sprobes_minus <- sprobes %>% mutate(strand = -1) %>% select(chrom, start, end, strand, id, keep, cgs)
