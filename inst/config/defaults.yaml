@@ -14,10 +14,10 @@ use_sge: false
 # Probe requirments
 min_cgs: 1
 kmer_k: 15
-max_kmers: 20000
+max_kmers: 40000
 
 TM_range:
-  - 56
+  - 60
   - 72
 optimal_TM_range:
   - 62
@@ -27,6 +27,13 @@ max_map: 1
 max_homopol: 8
 max_revcomp: 4
 max_shared_revcomp: 15
+
+# Verification
+verify_probes: true
+max_dist: 350
+max_cg_num: 2
+
+
 
 # binaries
 bowtie_bin: '/net/mraid14/export/data/users/eladch/tools/CO6/bowtie2/2.2.6/bin/bowtie2-align-l'
