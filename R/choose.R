@@ -1,4 +1,4 @@
-choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_probes_ofn=NULL, regs_annots=NULL, n_probes=NULL, kmer_len=15, downsample=FALSE, rm_revcomp=TRUE){
+choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_probes_ofn=NULL, regs_annots=NULL, n_probes=NULL, kmer_len=15, downsample=FALSE, rm_revcomp=TRUE, max_dist=350){
     if (rm_revcomp){
         loginfo('checking reverse complementarity')   
         p1 <- probes %>% arrange(-keep, chrom, start_reg, end_reg) %>% add_kmer_revcomp(k=kmer_len)  
@@ -8,32 +8,36 @@ choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_pro
         p1 <- probes        
     }
     
-
     loginfo('number of probes: %d', nrow(probes))
 
     if (downsample && !is.null(n_probes) && n_probes > nrow(probes)){
         probes <- downsample_probes(probes, n_probes, all_probes_ofn=all_probes_ofn)
     }
-    
-    
+        
     if (!is.null(regs_annots)){
         loginfo('adding annotations')
         regs_annot <- fread(regs_annots, sep=',') %>% as.tibble() %>% select(chrom, start, end, type)
-        probes_annot <- probes %>% select(chrom, start, end, strand) %>% gintervals.neighbors1(regs_annot %>% select(chrom, start, end, type), maxneighbors=10, maxdist=300) %>% group_by(chrom, start, end, strand) %>% summarise(type = unique(type) %>% paste(collapse=',')) %>% ungroup
+        probes_annot <- probes %>% 
+            select(chrom, start, end, strand) %>%
+            gintervals.neighbors1(regs_annot %>% select(chrom, start, end, type), maxneighbors=10) %>% 
+            filter(abs(dist) <= max_dist) %>% 
+            group_by(chrom, start, end, strand) %>% 
+            summarise(type = unique(type) %>% paste(collapse=',')) %>%
+            ungroup
         probes <- probes %>% left_join(probes_annot %>% rename(annot_type=type))
     }
 
-    # add original region ids    
-    probes <- regions %>% 
-        gintervals.neighbors1(select(probes, chrom, start=start_reg, end=end_reg)) %>%
+    # add original region ids      
+    reg2id <- regions %>% 
+        gintervals.neighbors1(select(probes, chrom, start=start_reg, end=end_reg), maxneighbors=10) %>% 
         filter(dist == 0) %>% 
         group_by(chrom1, start1, end1) %>% 
-        summarise(reg_id = paste(unique(id), collapse='_')) %>% 
+        summarise(reg_id = paste(unique(id), collapse='_')) %>%
         ungroup %>% 
-        select(chrom=chrom1, start_reg=start1, end_reg=end1, reg_id) %>% 
-        right_join(probes) %>% 
-        select(chrom, start, end, strand, keep, start_reg, end_reg, reg_id, everything())
-    
+        select(chrom=chrom1, start_reg=start1, end_reg=end1, reg_id)
+
+    probes <- probes %>% left_join(reg2id) %>%
+        select(chrom, start, end, strand, keep, start_reg, end_reg, reg_id, everything())    
 
     if (!is.null(probes_ofn)){
         write_csv(probes, probes_ofn)
@@ -43,8 +47,7 @@ choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_pro
 }
 
 
-choose_probes_per_regions <- function(cands, exp_regions, TM_range){
-    
+choose_probes_per_regions <- function(cands, exp_regions, TM_range){    
     cands <- annotate_cands(cands, exp_regions)
 
     loginfo('counting CpGs per strand')
@@ -70,7 +73,6 @@ choose_probes_per_regions <- function(cands, exp_regions, TM_range){
     left_regs <- probes20 %>% group_by(chrom, start_reg, end_reg) %>% filter(keep, n() == 1) %>% ungroup %>% distinct(chrom, start_reg, end_reg)
     probes20 <- probes20 %>% group_by(chrom, start_reg, end_reg) %>% filter(n() == 2) %>% ungroup
     probes20_cgs <- cands %>% inner_join(left_regs) %>% ungroup %>% get_probes(2, 0, TM_range, 1)
-
 
     left_regs <- probes02 %>% group_by(chrom, start_reg, end_reg) %>% filter(keep, n() == 1) %>% ungroup %>% distinct(chrom, start_reg, end_reg)
     probes02 <- probes02 %>% group_by(chrom, start_reg, end_reg) %>% filter(n() == 2) %>% ungroup

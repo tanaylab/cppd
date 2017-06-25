@@ -19,7 +19,7 @@ cppd.generate_probes <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_
     }
     conf <- apply_genome_conf(conf)
 
-    cmd_args <- conf2args(conf, c(generate_probes, get_candidates, regions2seq, gcluster.run2))
+    cmd_args <- conf2args(conf, c(generate_probes, get_candidates, regions2seq, check_probes, gcluster.run2))
 
     loginfo('run with the following paramters:')
     walk2(names(cmd_args), cmd_args, function(x, y) loginfo("%s: %s", x, y))
@@ -109,7 +109,7 @@ cppd.choose_from_cands <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, retur
 }
 
 
-generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, ...){
+generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, verify_probes=TRUE, ...){
     if (!is.null(misha_root)){
         gsetroot(misha_root)
     }
@@ -173,6 +173,11 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
     
     loginfo('calculating multiple-regions statistics')
     probes <- choose_probes(probes=chosen_cands, regions=regions, exp_regions=regs_exp, probes_ofn=probes, regs_annots=regions_annot, n_probes=n_probes, kmer_len=max_shared_revcomp, downsample=downsample, rm_revcomp=rm_revcomp)
+
+    loginfo('checking probes')    
+    if (verify_probes){
+        do.call_ellipsis(check_probes, list(probes=probes, regions=regions, TM_range=TM_range, optimal_TM_range=optimal_TM_range), ...)
+    }
 
     return(probes)
 }
