@@ -1,3 +1,11 @@
+#' Filter for putative enhancers that are within gene tads
+#' 
+#' @param genes character vector of gene symbols
+#' @param intervals putative enhancer intervals
+#' @param tads tad intervals: intervals set with an extra id column
+#' 
+#' @return intervals from \code{intervals} with an extra 'id' column for TAD id and 'gene' with the genes from \code{genes} within the TAD
+#' 
 #' @export
 cppd.gene_enhancers <- function(genes, intervals, tads){
 	gene_intervals <- gintervals.load('intervs.global.tss') %>% 
@@ -22,6 +30,14 @@ cppd.gene_enhancers <- function(genes, intervals, tads){
 	return(intervals)
 }
 
+#' Get promoter region of genes
+#' 
+#' @param genes character vector of gene symbols
+#' @param upstream number of base pairs upstream to the gene
+#' @param downstream number of base pairs downstream to the gene
+#' 
+#' @return intervals set with the gene promoters
+#' 
 #' @export
 cppd.gene_promoters <- function(genes, upstream=500, downstream=50){
     gintervals.load('intervs.global.tss') %>%

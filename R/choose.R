@@ -86,7 +86,6 @@ choose_probes_per_regions <- function(cands, exp_regions, TM_range){
     loginfo('adding sequence')    
     probes <- add_probe_seq(probes)
 
-
     return(probes)   
 }
 

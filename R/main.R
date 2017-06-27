@@ -9,6 +9,8 @@
 #'
 #' @export
 cppd.generate_probes <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_probes=FALSE){
+    logging::basicConfig()
+
     if (!is.null(log_fn)){
         logging::addHandler(logging::writeToFile, file=log_fn)
     }
@@ -72,7 +74,7 @@ cppd.dump_example_config <- function(path,
     if (!annotations){
         example[['regions_annot']] <- NULL
     }
-    write_lines(yaml::as.yaml(example), paste0(path, '/', name))
+    readr::write_lines(yaml::as.yaml(example), paste0(path, '/', name))
 
     if (!all(ret)) {
         logwarn("Couldn't dump config files to: %s", path)
@@ -81,35 +83,11 @@ cppd.dump_example_config <- function(path,
     }
 }
 
-
-#' @export
-cppd.choose_from_cands <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_probes=FALSE){
-    if (!is.null(log_fn)){
-        logging::addHandler(logging::writeToFile, file=log_fn)
-    }
-    conf <- read_yaml(conf_fn)
-    if (!is.null(defaults_fn)){
-        defaults <- read_yaml(defaults_fn)
-        conf <- plyr::defaults(conf, defaults)
-    }
-    conf <- apply_genome_conf(conf)
-
-    regions <- fread(conf$regions)
-    cands <- fread(conf$candidates)
-    exp_regions <- fread(conf$regions_expanded)
-    if (is.null(conf$rm_revcomp)){
-        conf$rm_revcomp <- TRUE
-    }
-    probes <- choose_probes(cands=cands, regions=regions, exp_regions=exp_regions, TM_range=conf$optimal_TM_range, probes_ofn=conf$probes, all_probes_ofn=conf$all_probes_ofn, regs_annots=conf$regions_annot, n_probes=conf$n_probes, kmer_len=conf$max_shared_revcomp, downsample=conf$downsample, rm_revcomp=conf$rm_revcomp)
-
-    if (return_probes){
-        return(probes)
-    }
-    return(NULL)
-}
-
-
 generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, verify_probes=TRUE, ...){
+
+    opt <- getOption('gmax.data.size')
+    on.exit(options(gmax.data.size=opt))
+
     if (!is.null(misha_root)){
         gsetroot(misha_root)
     }
@@ -159,6 +137,7 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
     
     loginfo('collecting chunks - expanded regions')
     regs_exp <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), ~ fread(.)) %>% as.tibble()
+    # regs_exp <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
 
     if (!is.null(regions_expanded)){
         fwrite(regs_exp, regions_expanded, sep=',')
@@ -166,6 +145,7 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
 
     loginfo('collecting chunks - candidates')
     cands <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), ~ fread(.)) %>% as.tibble()
+    # cands <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
     
     if (!is.null(candidates)){
         fwrite(cands, candidates, sep=',')
@@ -181,7 +161,6 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
 
     return(probes)
 }
-
 
 ############################################################################
 apply_genome_conf <- function(conf){

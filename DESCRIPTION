@@ -4,24 +4,27 @@ Version: 0.0.0.9000
 Authors@R: person("Aviezer", "Lifshitz", email = "aviezer.lifshitz@weizmann.ac.il", role = c("aut", "cre"))
 Description: Design probes for capture PBAT experiments.
 Depends:
-    R (>= 3.2.4)    
+    R (>= 3.2.4)
 Imports:
     plyr,    
     tibble,
-    dplyr (>= 0.5.0),
+    dplyr (>= 0.7.0),
     tidyr,
     purrr,
+    purrrlyr,
     ggplot2,
     scales,
     stringi,
     stringr,
     readr,
+    yaml,
     data.table,        
     doMC,
     parallel,
     GetoptLong,
-    logging
-#Remotes: url::http://www.wisdom.weizmann.ac.il/~aviezerl/gpatterns/misha_3.5.4.tar.gz
+    logging,
+    misha (>= 3.5.6)
+Remotes: url::http://www.wisdom.weizmann.ac.il/~aviezerl/gpatterns/misha_3.5.6.tar.gz
 License: GPL
 LazyData: true
 RoxygenNote: 6.0.1
