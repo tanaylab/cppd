@@ -1,7 +1,6 @@
 
-read_yaml <- function(yaml_fn, eval_expr=TRUE, handlers=NULL){
-    suppressPackageStartupMessages(library('stringr'))
-    yaml <- yaml::yaml.load_file(yaml_fn, handlers = list(expr = function(x) paste0("!expr ", as.character(x))))    
+read_yaml <- function(yaml_fn, eval_expr=TRUE, handlers=NULL){    
+    yaml <- yaml.load_file(yaml_fn, handlers = list(expr = function(x) paste0("!expr ", as.character(x))))    
     yaml <- .apply_handlers(yaml, handlers)
     yaml <- expand_yaml(yaml, eval_expr=eval_expr)
     return(yaml)
@@ -18,8 +17,7 @@ read_yaml <- function(yaml_fn, eval_expr=TRUE, handlers=NULL){
     yaml
 }
 
-expand_yaml <- function(yaml, eval_expr=TRUE){
-    suppressPackageStartupMessages(library('stringr'))
+expand_yaml <- function(yaml, eval_expr=TRUE){    
     incl_yaml <- list()
     if ('include' %in% names(yaml)){        
         for (incl_fn in yaml$include){

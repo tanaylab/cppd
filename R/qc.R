@@ -1,6 +1,36 @@
-# check_probes <- function(probes, regions=NULL, max_dist=350, max_cg_num=2, TM_range=c(60, 72), optimal_TM_range=c(62,65), max_map=1, max_homopol=8, max_revcomp=15, max_kmers=40000){
-check_probes <- function(probes, max_dist, max_cg_num, TM_range, optimal_TM_range, max_map, max_homopol, max_revcomp, max_kmers, regions=NULL){
-	check_sequence(probes)
+#' QC test pbat capture probes
+#'
+#' @param probes data frame with probes (output of cppd.generate_probes)
+#' @param conf_fn configuration file
+#' @param defaults_fn default configuration file (optional)
+#' @param log_fn log file (optional)
+#'
+#'
+#' @export
+cppd.check_probes <- function(probes, conf_fn, defaults_fn=NULL, log_fn=NULL){
+	logging::basicConfig()
+	
+	if (!is.null(log_fn)){
+        logging::addHandler(logging::writeToFile, file=log_fn)
+    }
+    conf <- read_yaml(conf_fn)
+    if (!is.null(defaults_fn)){
+        defaults <- read_yaml(defaults_fn)
+        conf <- plyr::defaults(conf, defaults)
+    }
+    conf <- apply_genome_conf(conf)    
+
+    cmd_args <- conf2args(conf, c(check_probes))    
+    cmd_args[['probes']] <- NULL
+
+    loginfo('testing with the following paramters:')
+    walk2(names(cmd_args), cmd_args, function(x, y) loginfo("%s: %s", x, y))
+
+    cmd_args[['probes']] <- probes    
+    do.call(check_probes, cmd_args)
+}
+
+check_probes <- function(probes, max_dist=350, max_cg_num=2, TM_range=c(60, 72), optimal_TM_range=c(62,65), max_map=1, max_homopol=8, max_revcomp=15, max_kmers=40000, regions=NULL){
 
 	probes_per_reg <- probes %>% count(chrom, start_reg, end_reg) %>% pull(n)
 	assert_probes_warn(all(probes_per_reg == 2), 'probes per region', 'not all regions have 2 probes')
@@ -23,16 +53,23 @@ check_probes <- function(probes, max_dist, max_cg_num, TM_range, optimal_TM_rang
 	assert_probes(all(probes$cg_num <= max_cg_num), 'maximal number of CpGs', 'some probes have more than %d cpgs', max_cg_num)
 
 	if (!is.null(regions)){
-		reg_ids <-  probes %>% separate_rows(reg_id) %>% pull(reg_id)
+		if (is.character(regions)){
+			regions <- fread(regions, sep=',') %>% as.tibble()
+		}
+		reg_ids <-  probes %>% tidyr::separate_rows(reg_id) %>% pull(reg_id)
 		assert_probes(all(reg_ids %in% regions$id), 'region ids appear in original regions', 'some region ids do not appear in original regions')		
 
 		regs_nb <- regions %>% filter(id %in% reg_ids) %>% gintervals.neighbors1(probes %>% select(chrom, start, end, strand), maxneighbors=2) %>% mutate(dist = abs(dist))
-		assert_probes_warn(all(regs_nb[['dist']] <= max_dist), 'probes distance', 'some probes are more than %d from the original region', max_dist)		
+		assert_probes_warn(all(regs_nb[['dist']] <= max_dist), 'probes distance', 'some probes are more than %dbp from the original region', max_dist)		
 	}
+
+	check_sequence(probes)
 }
 
-
 check_sequence <- function(probes){
+	opt <- getOption('gmax.data.size')
+	on.exit(options(gmax.data.size=opt))
+
 	pseq <- probes %>% 
 		select(chrom, start, end, strand, cg_num, genomic_seq, seq) %>% 
 		mutate(gseq = toupper(gseq.extract(.)), gseq_conv = gseq.extract_conv(.)) %>% 

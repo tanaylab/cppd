@@ -1,5 +1,4 @@
-## Generate kmers db
-
+#' Generate kmers db
 #' @param db_ofn prefix of kmers database files
 #'
 #' @param jellyfish_bin jellyfish binary
@@ -63,7 +62,7 @@ create_converted_fasta <- function(fasta_files, ofn, type){
     } else if (type == 'meth'){
         regex <- 'C(?!G)'
     } else {
-        logError('type can be "meth" / "unmeth" (%s provided)', type)
+        logerror('type can be "meth" / "unmeth" (%s provided)', type)
     }
 
     f <- function(x, pos){
@@ -111,7 +110,7 @@ get_n_kmers_jf <- function(df, k, jellyfish_db, jellyfish_bin){
 
 count_genome_kmers_jf <- function(seqs, jellyfish_db, k, jellyfish_bin, threads){
     seqs_df <- tibble(id = 1:length(seqs), seq=seqs)
-    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% ddply(.(chunk), function(x) get_n_kmers_jf(x, k, jellyfish_db, jellyfish_bin), .parallel=TRUE)
+    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% plyr::ddply(.(chunk), function(x) get_n_kmers_jf(x, k, jellyfish_db, jellyfish_bin), .parallel=TRUE)
     n_kmers <- kmers %>% arrange(id) %>% select(n_kmer) %>% .$n_kmer
     return(n_kmers)
 }
@@ -129,7 +128,7 @@ count_genome_kmers_tsv <- function(seqs, jellyfish_db, k, threads){
     seqs_df <- tibble(id = 1:length(seqs), seq=seqs)
 
     loginfo('getting kmers')
-    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% ddply(.(chunk), function(x) get_n_kmers_tsv(x, k, db), .parallel=TRUE)
+    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% plyr::ddply(.(chunk), function(x) get_n_kmers_tsv(x, k, db), .parallel=TRUE)
 
     loginfo('counting')
     n_kmers <- kmers %>% arrange(id) %>% select(n_kmer) %>% .$n_kmer

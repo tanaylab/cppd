@@ -12,8 +12,7 @@ gcluster.run2(..., command_list = NULL, opt.flags = "", max.jobs = 400,
   memory_flag = "-l mem_free=@{memory}G",
   threads_flag = "-pe threads @{threads}",
   io_saturation_flag = "-l io_saturation=@{io_saturation}",
-  script = paste(Sys.getenv("ANALYSIS_HOME"), "common", "sgjob.sh", sep =
-  "/"))
+  script = system.file("cluster", "sgjob.sh", package = "cppd"))
 }
 \arguments{
 \item{...}{R commands}
@@ -38,17 +37,23 @@ by a serial number}
 \item{collapse_results}{collapse return values of the jobs to a data frame.
 if not possible - would return the usual list.}
 
+\item{queue}{queue to use}
+
 \item{memory}{memory requirments (would be called using \code{memory_flag})}
 
 \item{threads}{threads requirments (would be called using \code{threads_flag})}
 
 \item{io_saturation}{io_saturation requirments (would be called using \code{io_saturation_flag})}
 
+\item{queue_flag}{flag for queue (formatted as in qq)}
+
 \item{memory_flag}{flag for memory requirment (formatted as in qq)}
 
 \item{threads_flag}{flag for threads requirment (formatted as in qq)}
 
 \item{io_saturation_flag}{flag for io_saturation requirment (formatted as in qq)}
+
+\item{script}{sgjob.sh script to use}
 }
 \value{
 if collapse_results is TRUE: data frame with the results of all jobs (rbinded).
@@ -56,9 +61,6 @@ if collapse_results is FALSE returns the same as: \link[misha]{gcluster.run}
 }
 \description{
 Runs R commands on a cluster that supports SGE
-}
-\examples{
-
 }
 \seealso{
 \link[misha]{gcluster.run}

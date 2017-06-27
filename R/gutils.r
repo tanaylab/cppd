@@ -1,18 +1,15 @@
+fread <- function(...) data.table::fread(..., data.table=FALSE)
 
 .random_track_name <- function(len=12){
     stringi::stri_rand_strings(1, len, "[a-z]")
 }
 
-
 #' Finds neighbors between two sets of intervals (and does not return conflicting column names)
 #'
-#' @inheritParams misha::gintervals.neighbours
+#' @inheritParams misha::gintervals.neighbors
 #'
-#' @return
 #' @export
-#' @seealso \link[misha]{gintrevals.neighbours}
 #'
-#' @examples
 gintervals.neighbors1 <- function(intervals1 = NULL,
                                   intervals2 = NULL,
                                   maxneighbors = 1,
@@ -45,10 +42,8 @@ gintervals.neighbors1 <- function(intervals1 = NULL,
 #' @param bind_intervals2 cbind add intervals2 to result
 #' @param ... additional parameters to gintervals.neighbours1
 #'
-#' @return
 #' @export
 #'
-#' @examples
 gintervals.filter <- function(intervals1, intervals2, max_distance=0, abs_dist = TRUE, bind_intervals2 = FALSE, ...){
     intervals1_cols <- colnames(intervals1)
     res <- intervals1 %>% gintervals.neighbors1(intervals2, ...)
@@ -114,7 +109,6 @@ gintervals.expand <- function(inv, expansion = 100) {
         gintervals.force_range()
 }
 
-#' @export
 gintervals.normalize <- function(inv, size) {
     centers <- gintervals.centers(inv) %>%
         mutate(end = end - 1)
@@ -127,7 +121,6 @@ gintervals.distance <- function(start1,end1,start2,end2) {
 }
 
 
-#' @export
 gintervals.center <- function(intervals1, intervals2, max_dist=0, size=NULL){
     res <- intervals1 %>% 
         gintervals.neighbors1(intervals2, na.if.notfound=T) %>% 
@@ -151,10 +144,7 @@ gintervals.center <- function(intervals1, intervals2, max_dist=0, size=NULL){
 #' @param func func
 #' @param params params
 #'
-#' @return
 #' @export
-#'
-#' @examples
 gvextract <- function(tracks, intervals, colnames = NULL, iterator = NULL,
               band = NULL, file = NULL, intervals.set.out = NULL, func=NULL, params=NULL){
     vtracks_pref <- .random_track_name()
@@ -187,11 +177,9 @@ gvextract <- function(tracks, intervals, colnames = NULL, iterator = NULL,
 #' @inheritParams misha::gextract
 #' @param suffix suffix for conflicting column names
 #'
-#' @return
 #' @export
 #'
 #' @seealso \link[misha]{gextract}
-#' @examples
 gextract.left_join <- function(expr, intervals = NULL, colnames = NULL, iterator = NULL, band = NULL, file = NULL, intervals.set.out = NULL, suffix='1'){
     if ('character' %in% class(intervals)){
         intervals <- gintervals.load(intervals)
@@ -203,96 +191,6 @@ gextract.left_join <- function(expr, intervals = NULL, colnames = NULL, iterator
     d <- d %>% arrange(intervalID) %>% left_join(intervals, by='intervalID') %>% select(-intervalID)
     return(d)
 }
-
-
-
-
-#' Apply a function on track expression in intervals
-#'
-#' @param f function to apply. First argument would be the result of gfunc
-#' called with the track expression, intervals, iterator and column names, i.e.:
-#' we would run for each chunk f(gfunc(expr, intervals, iterator=iterator, colnames=colnames))
-#' For additional parameters use anonymous functions, e.g. function(x) f1(x, param1=1, param2=2)
-#' @param expr track expression for gfunc
-#' @param intervals intervals for which track expressions are calculated
-#' @param iterator track expression iterator. If 'NULL' iterator is determined
-#' implicitly based on track expressions
-#' @param colnames sets the columns names in the returned value. If 'NULL' names
-#' are set to track expression.
-#' @param nchunks number of chunks to divide the intervals to.
-#' @param parallel run each chunk in parallel
-#' @param verbose verbose
-#' @param gfunc function to apply on track expression.
-#' can be any function that gets track expression, intervals, iterator and colnames,
-#' e.g. gextract, gextract.left_join, gscreen etc.
-#'
-#' @return for llply - list with the returned values from the functions.
-#' for ldply - data.frame with the returned values from the functions rbinded.
-#'
-#' @export
-#'
-#' @examples
-glply <- function(f, expr, intervals = NULL, iterator = NULL, colnames = NULL, nchunks=1, parallel=FALSE, verbose=FALSE, gfunc = misha::gextract){
-    old_opt <- options()
-    options(gmultitasking=FALSE)
-
-    run_chunk <- function(intervs, chunk_num){
-        if (verbose){
-            message(qq('starting chunk @{chunk_num}'))
-        }
-        suppressMessages(capture.output(ext <- gfunc(expr, intervals=intervs, iterator=iterator, colnames=colnames)))
-        if (verbose){
-            message(qq('finished extracting chunk @{chunk_num}'))
-        }
-        r <- f(ext)
-        if (verbose){
-            message(qq('finished chunk @{chunk_num}'))
-        }
-        return(r)
-    }
-
-    if (is.character(intervals)){
-        intervals <- gintervals.load(intervals)
-    }
-
-    res <- intervals %>%
-        mutate(chunk = ntile(chrom, nchunks)) %>%
-        plyr::dlply(.(chunk), function(y)
-            run_chunk(y %>% select(-chunk), y$chunk[1]),
-            .parallel = parallel,
-            .progress = 'text')
-
-    options(old_opt)
-    return(res)
-}
-
-
-#' @rdname glply
-#' @export
-gdply <- function(...){
-    res <- glply(...) %>% map_df(~ .x) %>% tbl_df
-    return(res)
-}
-
-
-gintervals.which=function(expr, intervals, iterator=expr, which.func=max) {
-  result.intervals = intervals
-  f = function(x) {
-    v <- which.func(x, na.rm=T)
-    idx <- match(v, x)
-    result.intervals[GAPPLY.INTERVID, ] <<- GAPPLY.INTERVALS[idx, ]
-    return(v)
-  }
-  gintervals.mapply(f, expr, intervals, enable.gapply.intervals=T, iterator=iterator)
-  result.intervals
-}
-
-
-gmax.coord=function(chr) {
-  x = ALLGENOME[[1]]
-  x[x$chrom == chr,"end"]
-}
-
 
 gseq.extract_conv <- function(..., methylated=TRUE) {
     res <- toupper(gseq.extract(...))
@@ -307,59 +205,6 @@ gseq.extract_conv <- function(..., methylated=TRUE) {
 gseq.rev_comp <- function(s) {
     chartr('acgtACGT', 'tgcaTGCA', s) %>% stringi::stri_reverse()
 }
-
-
-sum_ignore_na <- purrr::partial(sum, na.rm=T)
-sum_ignore_na_all <- sum_ignore_na
-
-
-#' split genomic intervals to bins
-#'
-#' @param intervals intervals
-#' @param nbins number of bins
-#'
-#' @return intervals set with \code{nbins} rows. if \code{nbins} < number of
-#' intervals the original intervals would be returned
-#'
-#' @export
-#'
-#' @examples
-gbin_intervals <- function(intervals, nbins){
-    if (nbins < nrow(intervals)){
-        warning('nbins is smaller than the number of intervals, would return intervals unchanged')
-    }
-    chrs <-  intervals %>% mutate(bins_chr=pmax(round(end / sum(end) * nbins), 1))
-    bin_diff <- sum(chrs$bins_chr) - nbins
-    if (bin_diff > 0){
-        chrs <- chrs %>% arrange(-bins_chr)
-        for (i in 1:abs(bin_diff)){
-            chrs$bins_chr[i] <- max(1, chrs$bins_chr[i] - 1)
-        }
-    }
-    if (bin_diff < 0){
-        chrs <- chrs %>% arrange(bins_chr)
-        for (i in 1:abs(bin_diff)){
-            chrs$bins_chr[i] <- chrs$bins_chr[i] + 1
-        }
-    }
-    binned_intervals <- plyr::adply(chrs, 1, function(x)
-        tibble(start=round(seq(x$start, x$end, length.out=x$bins_chr + 1))) %>%
-        mutate(end = ifelse(lead(start) == last(start), lead(start), lead(start) - 1)) %>%
-        drop_na
-        ) %>% select(-bins_chr)
-    return(binned_intervals)
-}
-
-
-
-#' Return an alternate empirical cumulative distribution, counting only
-#' values with a lower rank.
-#'
-#' For every value of x, return the number of values with a strictly
-#' lower rank than x.
-cume_dist_min <- function(x) {1 - cume_dist(-x)}
-
-
 
 gintervals.mark_overlapping <- function(intervals, unify_touching_intervals=TRUE, var='overlap')
 {
@@ -381,19 +226,21 @@ gintervals.mark_overlapping <- function(intervals, unify_touching_intervals=TRUE
 #' @param collapse_results collapse return values of the jobs to a data frame.
 #' if not possible - would return the usual list.
 #'
+#' @param queue queue to use
 #' @param memory memory requirments (would be called using \code{memory_flag})
 #' @param threads threads requirments (would be called using \code{threads_flag})
 #' @param io_saturation io_saturation requirments (would be called using \code{io_saturation_flag})
+#' @param queue_flag flag for queue (formatted as in qq)
 #' @param memory_flag flag for memory requirment (formatted as in qq)
 #' @param threads_flag flag for threads requirment (formatted as in qq)
 #' @param io_saturation_flag flag for io_saturation requirment (formatted as in qq)
+#' @param script sgjob.sh script to use
 #'
 #' @return if collapse_results is TRUE: data frame with the results of all jobs (rbinded).
 #' if collapse_results is FALSE returns the same as: \link[misha]{gcluster.run}
 #'
 #' @export
 #' @seealso \link[misha]{gcluster.run}
-#' @examples
 #'
 gcluster.run2 <- function (...,
                            command_list = NULL,
@@ -413,7 +260,7 @@ gcluster.run2 <- function (...,
                            memory_flag = '-l mem_free=@{memory}G',
                            threads_flag = '-pe threads @{threads}',
                            io_saturation_flag = '-l io_saturation=@{io_saturation}',
-                           script =paste(Sys.getenv('ANALYSIS_HOME'), 'common', 'sgjob.sh', sep='/')){
+                           script = system.file("cluster", "sgjob.sh", package="cppd")){
     
     if (!is.null(command_list)){ 
         commands <- purrr::map(command_list, function(x) parse(text=x))
@@ -607,82 +454,3 @@ gcluster.run2 <- function (...,
         unlink(tmp.dirname, recursive = TRUE)
     })
 }
-
-
-#' Import array from data frame
-#'
-#' @param df data frame with intervals and values
-#' @inheritParams misha::gtrack.array.import
-#'
-#' @return
-#' @export
-#'
-#' @examples
-gtrack.array.import_from_df <- function(df, track, description) {
-    fn <- tempfile()
-    data.table::fwrite(format(as.data.frame(df), scientific = FALSE), fn, na = "nan", row.names = FALSE, quote = FALSE, sep = "\t")    
-    tryCatch(gtrack.array.import(track, description, fn),
-             finally=system(qq('rm -f @{fn}')))
-}
-
-.gtrack.union_intervals <- function(tracks, intervals=ALLGENOME, iterator=NULL, parallel=TRUE, nchunks=5){
-    if (parallel){
-        map_reduce_union <- function(x)  alply(x, 1, giterator.intervals, .parallel=TRUE) %>% reduce(gintervals.union)
-        iter <- tibble(track=tracks, chunk=ntile(tracks, nchunks)) %>%
-            group_by(chunk) %>%
-            by_slice(~map_reduce_union(.x$track), .to='intervs') %>%
-            .$intervs %>%
-            reduce(gintervals.union)
-
-    } else {
-        iter <- giterator.intervals(tracks[1])
-        if (length(tracks) > 1){
-            iter <- giterator.intervals(tracks[1], intervals=intervals, iterator=iterator)
-            for (track in tracks[-2]) {
-                iter <- iter %>% gintervals.union(giterator.intervals(track, intervals=intervals, iterator=iterator))
-            }
-        }
-    }
-
-    return(iter)
-}
-
-gtrack.array.import_from_tracks <- function(tracks, intervals, track, description, iterator=NULL, colnames=NULL){
-    if (is.null(iterator)){
-        message('taking union of covered intervals as iterator')
-        iterator <- .gtrack.union_intervals(tracks, intervals=intervals)
-    }
-
-    message('extracting...')
-    fn <- tempfile()
-    print(fn)
-    df <- gextract(tracks, intervals=intervals, iterator=iterator, colnames=colnames, file = fn)
-
-    message('importing...')
-    tryCatch(gtrack.array.import(track, description, fn),
-             finally=system(qq('rm -f @{fn}')))
-}
-
-#' Wrapper around gtrack.import_mappedseq for (multiple) bam files
-#'
-#' @param bam_files vector of bam (or sam) files to import
-#' @param ... parameters of gtrack.import_mappedseq
-#'
-#' @return
-#' @export
-#' @seealso \link[misha]{gtrack.import_mappedseq}
-#' @examples
-gtrack.import_mappedseq_bam <- function(bam_files, ...){
-    cat_cmd <- 'cat'
-    if (length(bam_files) > 1){
-        cat_cmd <- 'samtools cat'
-    }
-    files <- paste(bam_files, collapse=' ')
-    tmp_fifo <- tempfile()
-    tryCatch({
-        system(qq('mkfifo @{tmp_fifo}; @{cat_cmd} @{files} | samtools view -h > @{tmp_fifo}'), wait=FALSE)
-        gtrack.import_mappedseq(file=tmp_fifo, cols.order=NULL, ...)
-        }, finally=system(qq('rm -f @{tmp_fifo}')))
-}
-
-
