@@ -110,7 +110,7 @@ get_n_kmers_jf <- function(df, k, jellyfish_db, jellyfish_bin){
 
 count_genome_kmers_jf <- function(seqs, jellyfish_db, k, jellyfish_bin, threads){
     seqs_df <- tibble(id = 1:length(seqs), seq=seqs)
-    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% plyr::ddply(.(chunk), function(x) get_n_kmers_jf(x, k, jellyfish_db, jellyfish_bin), .parallel=TRUE)
+    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% plyr::ddply(plyr::.(chunk), function(x) get_n_kmers_jf(x, k, jellyfish_db, jellyfish_bin), .parallel=TRUE)
     n_kmers <- kmers %>% arrange(id) %>% select(n_kmer) %>% .$n_kmer
     return(n_kmers)
 }
@@ -128,7 +128,7 @@ count_genome_kmers_tsv <- function(seqs, jellyfish_db, k, threads){
     seqs_df <- tibble(id = 1:length(seqs), seq=seqs)
 
     loginfo('getting kmers')
-    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% plyr::ddply(.(chunk), function(x) get_n_kmers_tsv(x, k, db), .parallel=TRUE)
+    kmers <- seqs_df %>% mutate(chunk = ntile(id, threads)) %>% plyr::ddply(plyr::.(chunk), function(x) get_n_kmers_tsv(x, k, db), .parallel=TRUE)
 
     loginfo('counting')
     n_kmers <- kmers %>% arrange(id) %>% select(n_kmer) %>% .$n_kmer

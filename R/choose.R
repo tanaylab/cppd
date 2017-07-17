@@ -13,7 +13,7 @@ choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_pro
     if (downsample && !is.null(n_probes) && n_probes > nrow(probes)){
         probes <- downsample_probes(probes, n_probes, all_probes_ofn=all_probes_ofn)
     }
-        
+
     if (!is.null(regs_annots)){
         loginfo('adding annotations')
         regs_annot <- fread(regs_annots, sep=',') %>% as.tibble() %>% select(chrom, start, end, type)
@@ -23,7 +23,7 @@ choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_pro
             filter(abs(dist) <= max_dist) %>% 
             group_by(chrom, start, end, strand) %>% 
             summarise(type = unique(type) %>% paste(collapse=',')) %>%
-            ungroup
+            ungroup()
         probes <- probes %>% left_join(probes_annot %>% rename(annot_type=type))
     }
 
@@ -47,7 +47,7 @@ choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_pro
 }
 
 
-choose_probes_per_regions <- function(cands, exp_regions, TM_range){    
+choose_probes_per_regions <- function(cands, exp_regions, TM_range){ 
     cands <- annotate_cands(cands, exp_regions)
 
     loginfo('counting CpGs per strand')
@@ -98,7 +98,7 @@ annotate_cands <- function(cands, exp_regs){
     cands <- add_GC_cont(cands) 
 
     # add keep annotation     
-    cands <- cands %>% left_join(exp_regs %>% select(chrom, start_reg, end_reg, keep))   
+    cands <- cands %>% left_join(exp_regs %>% select(chrom, start_reg, end_reg, keep)) %>% distinct(chrom, start, end, strand, id, seq, .keep_all=TRUE)  
     return(cands)
 }
 

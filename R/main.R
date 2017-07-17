@@ -83,7 +83,7 @@ cppd.dump_example_config <- function(path,
     }
 }
 
-generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, verify_probes=TRUE, ...){
+generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_range, regions_expanded=NULL, candidates=NULL, chosen_candidates=NULL, regions_annot=NULL, n_probes=NULL, max_shared_revcomp=15, downsample=FALSE, threads=1, misha_root=NULL, rm_revcomp=TRUE, workdir=tempdir(), use_sge=FALSE, verify_probes=TRUE, only_choose=FALSE, ...){
 
     opt <- getOption('gmax.data.size')
     on.exit(options(gmax.data.size=opt))
@@ -100,57 +100,68 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
     if (!keep_field){
         regions[['keep']] <- FALSE
     }
+
+    if (!only_choose){
     
-    nchunks <- ceiling(nrow(regions) / chunk_size)
-    loginfo(qq('number of chunks: @{nchunks}'))
+        nchunks <- ceiling(nrow(regions) / chunk_size)
+        loginfo(qq('number of chunks: @{nchunks}'))
 
-    regs <- regions %>% mutate(chunk = ntile(1:n(), nchunks))
+        regs <- regions %>% mutate(chunk = ntile(1:n(), nchunks))
 
-    run_chunk <- function(chunk_num, temp_prefix, ...){   
-        loginfo('chunk %d', chunk_num)   
-        cands_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_cands')        
-        regs_exp_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_regs_exp')
-        do.call_ellipsis(get_candidates, 
-            list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
-                TM_range=TM_range, 
-                threads=threads, 
-                cands_ofn=cands_ofn, 
-                regs_exp_ofn=regs_exp_ofn), ...)
-        cands <- fread(cands_ofn, sep=',') %>% as.tibble()
-        regs_exp <- fread(regs_exp_ofn, sep=',') %>% as.tibble()
-        chosen_cands <- choose_probes_per_regions(cands=cands, 
-                exp_regions=regs_exp,
-                TM_range=optimal_TM_range)
-        return(chosen_cands)
-    }
+        run_chunk <- function(chunk_num, temp_prefix, ...){   
+            loginfo('chunk %d', chunk_num)   
+            cands_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_cands')        
+            regs_exp_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_regs_exp')
+            do.call_ellipsis(get_candidates, 
+                list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
+                    TM_range=TM_range, 
+                    threads=threads, 
+                    cands_ofn=cands_ofn, 
+                    regs_exp_ofn=regs_exp_ofn), ...)
+            cands <- fread(cands_ofn, sep=',') %>% as.tibble()
+            regs_exp <- fread(regs_exp_ofn, sep=',') %>% as.tibble()
+            chosen_cands <- choose_probes_per_regions(cands=cands, 
+                    exp_regions=regs_exp,
+                    TM_range=optimal_TM_range)
+            return(chosen_cands)
+        }
 
-    temp_prefix <- tempfile(tmpdir=workdir)
-    on.exit(system(qq('rm -f @{temp_prefix}*')))
+        temp_prefix <- tempfile(tmpdir=workdir)
+        on.exit(system(qq('rm -f @{temp_prefix}*')))
 
-    if (use_sge){
-        cmds <- paste0('run_chunk(', 1:nchunks, ', temp_prefix=temp_prefix, ...)')            
-        res <- gcluster.run2(command_list=cmds, ...)
-        chosen_cands <- map_df(res, 'retv')
+        if (use_sge){
+            cmds <- paste0('run_chunk(', 1:nchunks, ', temp_prefix=temp_prefix, ...)')            
+            res <- gcluster.run2(command_list=cmds, ...)
+            chosen_cands <- map_df(res, 'retv')
+        } else {
+            chosen_cands <- map_df(1:nchunks, ~ run_chunk(.x, temp_prefix=temp_prefix, ...))
+        }   
+        
+        loginfo('collecting chunks - expanded regions')
+        regs_exp <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), ~ fread(.)) %>% as.tibble()
+        # regs_exp <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
+
+        if (!is.null(regions_expanded)){
+            fwrite(regs_exp, regions_expanded, sep=',')
+        }
+
+        loginfo('collecting chunks - candidates')
+        cands <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), ~ fread(.)) %>% as.tibble()
+        # cands <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
+        
+        if (!is.null(candidates)){
+            fwrite(cands, candidates, sep=',')
+        }
+
+        if (!is.null(chosen_candidates)){
+            fwrite(chosen_cands, chosen_candidates, sep=',')   
+        }
     } else {
-        chosen_cands <- map_df(1:nchunks, ~ run_chunk(.x, temp_prefix=temp_prefix, ...))
-    }   
-    
-    loginfo('collecting chunks - expanded regions')
-    regs_exp <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), ~ fread(.)) %>% as.tibble()
-    # regs_exp <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
-
-    if (!is.null(regions_expanded)){
-        fwrite(regs_exp, regions_expanded, sep=',')
+        loginfo('loading candidates and regions')
+        chosen_cands <- fread(chosen_candidates) %>% as.tibble()
+        regs_exp <- fread(regions_expanded) %>% as.tibble()
     }
 
-    loginfo('collecting chunks - candidates')
-    cands <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), ~ fread(.)) %>% as.tibble()
-    # cands <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
-    
-    if (!is.null(candidates)){
-        fwrite(cands, candidates, sep=',')
-    }
-    
     loginfo('calculating multiple-regions statistics')
     probes <- choose_probes(probes=chosen_cands, regions=regions, exp_regions=regs_exp, probes_ofn=probes, regs_annots=regions_annot, n_probes=n_probes, kmer_len=max_shared_revcomp, downsample=downsample, rm_revcomp=rm_revcomp)
 
