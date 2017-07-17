@@ -9,7 +9,7 @@
 #' @export
 cppd.check_probes <- function(probes, conf_fn, defaults_fn=NULL, log_fn=NULL){
 	logging::basicConfig()
-	
+
 	if (!is.null(log_fn)){
         logging::addHandler(logging::writeToFile, file=log_fn)
     }
@@ -30,7 +30,11 @@ cppd.check_probes <- function(probes, conf_fn, defaults_fn=NULL, log_fn=NULL){
     do.call(check_probes, cmd_args)
 }
 
-check_probes <- function(probes, max_dist=350, max_cg_num=2, TM_range=c(60, 72), optimal_TM_range=c(62,65), max_map=1, max_homopol=8, max_revcomp=15, max_kmers=40000, regions=NULL){
+check_probes <- function(probes, max_dist=350, max_cg_num=2, TM_range=c(60, 72), optimal_TM_range=c(62,65), max_map=1, max_homopol=8, max_revcomp=15, max_kmers=40000, regions=NULL, misha_root=NULL){
+
+    if (!is.null(misha_root)){
+        gsetroot(misha_root)
+    }
 
 	probes_per_reg <- probes %>% count(chrom, start_reg, end_reg) %>% pull(n)
 	assert_probes_warn(all(probes_per_reg == 2), 'probes per region', 'not all regions have 2 probes')
@@ -52,15 +56,27 @@ check_probes <- function(probes, max_dist=350, max_cg_num=2, TM_range=c(60, 72),
 
 	assert_probes(all(probes$cg_num <= max_cg_num), 'maximal number of CpGs', 'some probes have more than %d cpgs', max_cg_num)
 
+	seq_n <- count(probes, seq)
+	assert_probes_warn(all(seq_n$n == 1), 'duplicates', 'some sequences appear more than once')	
+
+	probes_per_region <- probes %>% count(chrom, start_reg, end_reg)
+	assert_probes_warn(all(probes_per_region$n == 2), 'probes per region', 'some regions have more than 2 probes')	
+
 	if (!is.null(regions)){
 		if (is.character(regions)){
 			regions <- fread(regions, sep=',') %>% as.tibble()
 		}
-		reg_ids <-  probes %>% tidyr::separate_rows(reg_id) %>% pull(reg_id)
-		assert_probes(all(reg_ids %in% regions$id), 'region ids appear in original regions', 'some region ids do not appear in original regions')		
+		if ('reg_id' %in% colnames(probes)){
+			reg_ids <-  probes %>% tidyr::separate_rows(reg_id) %>% pull(reg_id)
+			assert_probes(all(reg_ids %in% regions$id), 'region ids appear in original regions', 'some region ids do not appear in original regions')		
+			
+			regs_nb <- regions %>% filter(id %in% reg_ids) %>% gintervals.neighbors1(probes %>% select(chrom, start, end, strand), maxneighbors=2) %>% mutate(dist = abs(dist))
+			assert_probes_warn(all(regs_nb[['dist']] <= max_dist), 'probes distance', 'some probes are more than %dbp from the original region', max_dist)		
 
-		regs_nb <- regions %>% filter(id %in% reg_ids) %>% gintervals.neighbors1(probes %>% select(chrom, start, end, strand), maxneighbors=2) %>% mutate(dist = abs(dist))
-		assert_probes_warn(all(regs_nb[['dist']] <= max_dist), 'probes distance', 'some probes are more than %dbp from the original region', max_dist)		
+			regs_dist <- probes %>% select(chrom, start, end) %>% gintervals.neighbors1(regions) %>% pull(dist)		
+			assert_probes_warn(all(regs_dist <= max_dist), 'probes distance from any region', 'some probes are more than %dbp from any original region', max_dist)		
+
+		}		
 	}
 
 	check_sequence(probes)
@@ -79,6 +95,8 @@ check_sequence <- function(probes){
 	assert_probes(all(pseq$cg_num > 0 | pseq$seq == pseq$gseq_conv), 'seq', 'seq is corrupt')	
 	assert_probes(all(pseq$cg_num == pseq$cgs), 'cg_num', 'cg_num is corrupt')	
 	assert_probes(all(pseq$seq_cgs == 0), 'cgs in probe sequence', 'there are CpGs in probe sequence')	
+
+
 }
 
 assert <- function (cond, error_msg='', ...){
