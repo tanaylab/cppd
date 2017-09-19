@@ -25,7 +25,7 @@ cppd.generate_probes <- function(conf_fn, defaults_fn=NULL, log_fn=NULL, return_
 
     loginfo('run with the following paramters:')
     walk2(names(cmd_args), cmd_args, function(x, y) loginfo("%s: %s", x, y))
-
+    
     probes <- do.call(generate_probes, cmd_args)
 
     if (return_probes){
@@ -112,6 +112,7 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
             loginfo('chunk %d', chunk_num)   
             cands_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_cands')        
             regs_exp_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_regs_exp')
+            
             do.call_ellipsis(get_candidates, 
                 list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
                     TM_range=TM_range, 
@@ -128,13 +129,13 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
 
         temp_prefix <- tempfile(tmpdir=workdir)
         on.exit(system(qq('rm -f @{temp_prefix}*')))
-
+        
         if (use_sge){
             cmds <- paste0('run_chunk(', 1:nchunks, ', temp_prefix=temp_prefix, ...)')            
             res <- gcluster.run2(command_list=cmds, ...)
             chosen_cands <- map_df(res, 'retv')
-        } else {
-            chosen_cands <- map_df(1:nchunks, ~ run_chunk(.x, temp_prefix=temp_prefix, ...))
+        } else {            
+            chosen_cands <- map_dfr(1:nchunks, run_chunk, temp_prefix=temp_prefix, ...)
         }   
         
         loginfo('collecting chunks - expanded regions')

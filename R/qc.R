@@ -57,7 +57,7 @@ check_probes <- function(probes, max_dist=350, max_cg_num=2, TM_range=c(60, 72),
 	assert_probes(all(probes$cg_num <= max_cg_num), 'maximal number of CpGs', 'some probes have more than %d cpgs', max_cg_num)
 
 	seq_n <- count(probes, seq)
-	assert_probes_warn(all(seq_n$n == 1), 'duplicates', 'some sequences appear more than once')	
+	assert_probes_warn(all(seq_n$n == 1), 'duplicate probes', 'some sequences appear more than once')	
 
 	probes_per_region <- probes %>% count(chrom, start_reg, end_reg)
 	assert_probes_warn(all(probes_per_region$n == 2), 'probes per region', 'some regions have more than 2 probes')	
