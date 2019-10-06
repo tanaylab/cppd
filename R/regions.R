@@ -19,8 +19,8 @@ cppd.gene_enhancers <- function(genes, intervals, tads){
 	intervals <- intervals %>% 
 		gintervals.neighbors1(tads) %>% 
 		filter(dist == 0) %>% 
-		select(-(chrom1:end1), -dist)	
-	gene_intervals <- gene_intervals %>% distinct(id, gene) %>% group_by(id) %>% nest(gene, .key='gene')
+		select(-(chrom1:end1), -dist)	    
+	gene_intervals <- gene_intervals %>% distinct(id, gene) %>% group_by(id) %>% nest(gene = gene)
 	intervals <- intervals %>%
 		filter(id %in% gene_intervals$id) %>% 
 		left_join(gene_intervals, by='id') %>% 
