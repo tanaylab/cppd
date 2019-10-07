@@ -104,7 +104,7 @@ get_n_kmers_jf <- function(df, k, jellyfish_db, jellyfish_bin){
     kmers <- seqs2kmers(df, k)
     kmer_fn <- write_fasta(kmers$kmer)
     on.exit(qq('rm -f @{kmer_fn}'))
-    kmer_counts <- fread(qq('@{jellyfish_bin} query -s @{kmer_fn} @{jellyfish_db}'), col.names=c('kmer', 'n_kmer'))
+    kmer_counts <- fread(cmd = qq('@{jellyfish_bin} query -s @{kmer_fn} @{jellyfish_db}'), col.names=c('kmer', 'n_kmer'))
     kmers %>% left_join(kmer_counts, by='kmer') %>% group_by(id) %>% summarise(n_kmer = max(n_kmer)) %>% right_join(df, by='id')
 }
 

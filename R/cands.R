@@ -126,7 +126,7 @@ count_mappings <- function(seqs, threads=10, bowtie_bin='/net/mraid14/export/dat
     on.exit(qq('rm -f @{fasta_fn}'))
 
     cmd <- qq('@{bowtie_bin} --wrapper basic-0 -f -U @{fasta_fn} -x @{bissli2_idx}  --quiet -k @{max_k} -p @{threads} --reorder | samtools view -F 4 | awk \'{print $1}\'')
-    mappings <- fread(cmd, col.names='read') %>% count(read)
+    mappings <- fread(cmd = cmd, col.names='read') %>% count(read)
 
     n_mapping <- tibble(seq=seqs, read=paste0('read', 1:length(seqs))) %>% left_join(mappings, by='read') %>% mutate(n = ifelse(is.na(n), 0, n)) %>% .$n
 
