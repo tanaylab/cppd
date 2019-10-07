@@ -93,7 +93,7 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
     }
 
     if (is.character(regions)){
-        regions <- fread(regions) %>% tbl_df
+        regions <- fread(regions) %>% as_tibble()
     }
 
     keep_field <- 'keep' %in% colnames(regions)
@@ -113,14 +113,14 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
             cands_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_cands')        
             regs_exp_ofn <- paste0(temp_prefix, '_chunk_', chunk_num, '_regs_exp')
             
-            do.call_ellipsis(get_candidates, 
+            do_call_ellipsis(get_candidates, 
                 list(regs=regs %>% filter(chunk == chunk_num) %>% select(-chunk), 
                     TM_range=TM_range, 
                     threads=threads, 
                     cands_ofn=cands_ofn, 
                     regs_exp_ofn=regs_exp_ofn), ...)
-            cands <- fread(cands_ofn, sep=',') %>% as.tibble()
-            regs_exp <- fread(regs_exp_ofn, sep=',') %>% as.tibble()
+            cands <- fread(cands_ofn, sep=',') %>% as_tibble()
+            regs_exp <- fread(regs_exp_ofn, sep=',') %>% as_tibble()
             chosen_cands <- choose_probes_per_regions(cands=cands, 
                     exp_regions=regs_exp,
                     TM_range=optimal_TM_range)
@@ -139,16 +139,16 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
         }   
         
         loginfo('collecting chunks - expanded regions')
-        regs_exp <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), ~ fread(.)) %>% as.tibble()
-        # regs_exp <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
+        regs_exp <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), ~ fread(.)) %>% as_tibble()
+        # regs_exp <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_regs_exp'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as_tibble()
 
         if (!is.null(regions_expanded)){
             fwrite(regs_exp, regions_expanded, sep=',')
         }
 
         loginfo('collecting chunks - candidates')
-        cands <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), ~ fread(.)) %>% as.tibble()
-        # cands <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as.tibble()
+        cands <- map_df(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), ~ fread(.)) %>% as_tibble()
+        # cands <- plyr::adply(paste0(temp_prefix, '_chunk_', 1:nchunks, '_cands'), 1, fread, .parallel=TRUE) %>% select(-X1) %>% as_tibble()
         
         if (!is.null(candidates)){
             fwrite(cands, candidates, sep=',')
@@ -159,8 +159,8 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
         }
     } else {
         loginfo('loading candidates and regions')
-        chosen_cands <- fread(chosen_candidates) %>% as.tibble()
-        regs_exp <- fread(regions_expanded) %>% as.tibble()
+        chosen_cands <- fread(chosen_candidates) %>% as_tibble()
+        regs_exp <- fread(regions_expanded) %>% as_tibble()
     }
 
     loginfo('calculating multiple-regions statistics')
@@ -168,7 +168,7 @@ generate_probes <- function(regions, chunk_size, probes, TM_range, optimal_TM_ra
 
     loginfo('checking probes')    
     if (verify_probes){
-        do.call_ellipsis(check_probes, list(probes=probes, regions=regions, TM_range=TM_range, optimal_TM_range=optimal_TM_range), ...)
+        do_call_ellipsis(check_probes, list(probes=probes, regions=regions, TM_range=TM_range, optimal_TM_range=optimal_TM_range), ...)
     }
 
     return(probes)

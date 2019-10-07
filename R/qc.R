@@ -64,11 +64,11 @@ check_probes <- function(probes, max_dist=350, max_cg_num=2, TM_range=c(60, 72),
 
 	if (!is.null(regions)){
 		if (is.character(regions)){
-			regions <- fread(regions, sep=',') %>% as.tibble()
+			regions <- fread(regions, sep=',') %>% as_tibble()
 		}
 		if ('reg_id' %in% colnames(probes)){
 			reg_ids <-  probes %>% tidyr::separate_rows(reg_id) %>% pull(reg_id)
-			assert_probes(all(reg_ids %in% regions$id), 'region ids appear in original regions', 'some region ids do not appear in original regions')		
+			assert_probes_warn(all(reg_ids %in% regions$id), 'region ids appear in original regions', 'some region ids do not appear in original regions')		
 			
 			regs_nb <- regions %>% filter(id %in% reg_ids) %>% gintervals.neighbors1(probes %>% select(chrom, start, end, strand), maxneighbors=2) %>% mutate(dist = abs(dist))
 			assert_probes_warn(all(regs_nb[['dist']] <= max_dist), 'probes distance', 'some probes are more than %dbp from the original region', max_dist)		

@@ -1,4 +1,4 @@
-do.call_ellipsis <- function(f, additional_params=list(), ...){
+do_call_ellipsis <- function(f, additional_params=list(), ...){
     f_args <- names(as.list(args(f)))
     elipsis <- list(...)        
     if (!is.null(names(elipsis))){

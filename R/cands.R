@@ -5,7 +5,7 @@ get_candidates <- function(regs, probe_len, step, expand, threads, bowtie_bin, b
         doMC::registerDoMC(threads)
     }
     
-    regs_exp <- do.call_ellipsis(regions2seq, list(sprobes_all=regs, expand=expand), ...) %>% mutate(start_reg=start, end_reg=end)    
+    regs_exp <- do_call_ellipsis(regions2seq, list(sprobes_all=regs, expand=expand), ...) %>% mutate(start_reg=start, end_reg=end)    
 
     max_str_len <- max(str_length(regs_exp$seq) )
     cands <- map_df(seq(1, max_str_len-probe_len, step), ~ get_cand_seq(regs_exp, ., probe_len))     
@@ -151,7 +151,7 @@ split_intervals <- function(intervs){
 }
 
 regions2seq <- function(sprobes_all, expand, max_len=651, exp_tab_fn=NULL, min_cgs=1){         
-    sprobes <- sprobes_all %>% mutate(start = start - expand, end = end + expand) %>% as.data.frame %>% gintervals.force_range() %>% gintervals.canonic() %>% mutate(l = end - start, split = l > as.numeric(max_len)) %>% tbl_df
+    sprobes <- sprobes_all %>% mutate(start = start - expand, end = end + expand) %>% as.data.frame %>% gintervals.force_range() %>% gintervals.canonic() %>% mutate(l = end - start, split = l > as.numeric(max_len)) %>% as_tibble()
     
     loginfo("max_len: %s", max_len)
     loginfo("expand: %s", expand)

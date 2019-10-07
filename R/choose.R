@@ -16,7 +16,7 @@ choose_probes <- function(probes, regions, exp_regions, probes_ofn=NULL, all_pro
 
     if (!is.null(regs_annots)){
         loginfo('adding annotations')
-        regs_annot <- fread(regs_annots, sep=',') %>% as.tibble() %>% select(chrom, start, end, type)
+        regs_annot <- fread(regs_annots, sep=',') %>% as_tibble() %>% select(chrom, start, end, type)
         probes_annot <- probes %>% 
             select(chrom, start, end, strand) %>%
             gintervals.neighbors1(regs_annot %>% select(chrom, start, end, type), maxneighbors=10) %>% 
@@ -165,11 +165,12 @@ downsample_probes <- function(probes, n_probes, all_probes_ofn=NULL){
     if (!is.null(all_probes_ofn)){
         write_csv(probes, all_probes_ofn)
     }
-    probes <- probes %>% group_by(chrom, start_reg, end_reg) %>% mutate(n_reg = n()) %>% ungroup
-    probes_ds <- probes %>% arrange(-keep, chrom, start_reg, end_reg) %>% slice(1:n_probes)
 
+    probes <- probes %>% group_by(chrom, start_reg, end_reg) %>% mutate(n_reg = n()) %>% ungroup()
+    probes_ds <- probes %>% arrange(-keep, chrom, start_reg, end_reg) %>% slice(1:n_probes)
+    
     # make sure that we have all the probes from each region
-    probes_ds <- probes_ds %>% left_join(probes %>% select(chrom, start_reg, end_reg, n_reg_org=n_reg)) %>% filter(n_reg == n_reg_org) %>% select(-n_reg_org, -n_reg)
+    probes_ds <- probes_ds %>% left_join(probes %>% select(chrom, start_reg, end_reg, n_reg_org=n_reg) %>% distinct(chrom, start_reg, end_reg, n_reg_org)) %>% filter(n_reg == n_reg_org) %>% select(-n_reg_org, -n_reg)
 
     return(probes_ds)
 }

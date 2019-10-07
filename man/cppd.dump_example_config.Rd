@@ -4,9 +4,9 @@
 \alias{cppd.dump_example_config}
 \title{Dump config file templates.}
 \usage{
-cppd.dump_example_config(path, name = "example.yaml", probes_dir = NULL,
-  genome = NULL, n_probes = 20000, downsample = FALSE,
-  insert_length = 350, annotations = FALSE)
+cppd.dump_example_config(path, name = "example.yaml",
+  probes_dir = NULL, genome = NULL, n_probes = 20000,
+  downsample = FALSE, insert_length = 350, annotations = FALSE)
 }
 \arguments{
 \item{path}{directory to dump files to.}

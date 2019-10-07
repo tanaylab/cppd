@@ -10,7 +10,7 @@
 #' @import stringr
 #' @import ggplot2
 #' @import misha
-#' @importFrom tibble as.tibble
+#' @importFrom tibble as_tibble
 #' @importFrom tibble tibble
 #' @importFrom yaml yaml.load_file
 #' @importFrom data.table fwrite

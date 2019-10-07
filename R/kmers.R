@@ -86,7 +86,7 @@ seqs2kmers <- function(seqs_df, k, group_columns='id'){
             seq_mat %>%
                 select(one_of(c(group_columns, paste0('c', x$s:x$e) ))) %>%
                 unite('kmer', one_of( paste0('c', x$s:x$e) ), sep='')) %>%
-        select(-s, -e) %>% tbl_df
+        select(-s, -e) %>% as_tibble()
     return(kmers)
 }
 
@@ -124,7 +124,7 @@ get_n_kmers_tsv <- function(df, k, db){
 
 count_genome_kmers_tsv <- function(seqs, jellyfish_db, k, threads){
     loginfo('reading db %s', jellyfish_db)
-    db <- fread(jellyfish_db, col.names=c('kmer', 'n_kmer')) %>% tbl_df
+    db <- fread(jellyfish_db, col.names=c('kmer', 'n_kmer')) %>% as_tibble()
     seqs_df <- tibble(id = 1:length(seqs), seq=seqs)
 
     loginfo('getting kmers')
@@ -144,7 +144,7 @@ add_kmer_revcomp <- function(df, k=15){
     df_kmers <- df %>% select(chrom, start, end, strand, start_reg, end_reg, seq) %>% seqs2kmers(k, group_columns=c('chrom', 'start', 'end', 'strand', 'start_reg', 'end_reg'))
 
     loginfo('reverse complementing')
-    revcomp_kmers <-  df_kmers %>% mutate(kmer = gseq.rev_comp(kmer)) %>% left_join(ids) %>% select(kmer, kmer_id=id)
+    revcomp_kmers <- df_kmers %>% mutate(kmer = gseq.rev_comp(kmer)) %>% left_join(ids) %>% select(kmer, kmer_id=id)
 
 
     loginfo('looking for matches')

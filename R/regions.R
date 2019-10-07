@@ -11,7 +11,7 @@ cppd.gene_enhancers <- function(genes, intervals, tads){
 	gene_intervals <- gintervals.load('intervs.global.tss') %>% 
 		filter(geneSymbol %in% genes) %>% 
 		select(chrom, start, end, strand, gene=geneSymbol) %>%
-		as.tibble()
+		as_tibble()
 	gene_intervals <- gene_intervals %>% 
 		gintervals.neighbors1(tads) %>% 
 		filter(dist == 0) %>% 
@@ -44,5 +44,15 @@ cppd.gene_promoters <- function(genes, upstream=500, downstream=50){
     	filter(geneSymbol %in% genes) %>% 
     	mutate(start = ifelse(strand == 1, start - upstream, start - downstream), 
     		   end = ifelse(strand == 1, end + downstream, end + upstream)) %>% 
-    	tbl_df()
+    	as_tibble()
+}
+
+
+#' Get CpGs within a region
+#' 
+#' @param intervals intervals set
+#' 
+#' @return intervals set of CpGs within the given intervals
+cppd.intervals_cpgs <- function(intervals){
+    gintervals.neighbors1(giterator.intervals(iterator="intervs.global.seq_CG", intervals=intervals), intervals) 
 }
