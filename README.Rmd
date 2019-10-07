@@ -45,6 +45,7 @@ fwrite(gene_promoters, "regions.csv")
 cppd.dump_example_config("config.yaml")
 
 # -- fill the yaml file  --
+file.edit("config.yaml")
 
 # generate probes
 probes <- cppd.generate_probes("config.yaml", return_probes = TRUE)
