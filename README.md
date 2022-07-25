@@ -4,12 +4,12 @@ cppd: Capture PBAT Probe Designer
 
 <!-- badges: start -->
 <!-- badges: end -->
-The goal of cppd is to provide tools to design capture-PBAT probes. The
+The goal of cppd is to provide tools to design capture-PBAT probes. 
 
 Installation
 ------------
 
-You can install gpwm by running:
+You can install cppd by running:
 
 ``` r
 remotes::install_github("tanaylab/cppd")
