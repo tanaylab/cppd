@@ -1,6 +1,6 @@
 Package: cppd
 Title: Capture PBAT Probe Designer
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: person("Aviezer", "Lifshitz", email = "aviezer.lifshitz@weizmann.ac.il", role = c("aut", "cre"))
 Description: Design probes for capture PBAT experiments.
 Depends:
